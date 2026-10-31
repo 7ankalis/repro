@@ -29,5 +29,15 @@
   },
   "checked_at": "2026-10-31T17:21:15.616291+00:00",
   "mode": "text_only",
-  "directory": "arvo-49546-text_only"
+  "directory": "arvo-49546-text_only",
+  "report_generation": {
+    "model": "meta-models/muse-spark-open-1026",
+    "calls": 1,
+    "attempts": 1,
+    "tokens_in": 1623,
+    "tokens_out": 707,
+    "tokens_cached": 0,
+    "cost_usd": 0.0,
+    "generated_at": "2026-10-31T19:59:57+00:00"
+  }
 }

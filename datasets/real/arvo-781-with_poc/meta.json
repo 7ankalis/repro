@@ -29,5 +29,15 @@
   },
   "checked_at": "2026-10-31T14:56:44.342000+00:00",
   "mode": "with_poc",
-  "directory": "arvo-781-with_poc"
+  "directory": "arvo-781-with_poc",
+  "report_generation": {
+    "model": "meta-models/muse-spark-open-1026",
+    "calls": 1,
+    "attempts": 1,
+    "tokens_in": 1129,
+    "tokens_out": 639,
+    "tokens_cached": 0,
+    "cost_usd": 0.0,
+    "generated_at": "2026-10-31T20:00:18+00:00"
+  }
 }

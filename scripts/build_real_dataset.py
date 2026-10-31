@@ -5,14 +5,14 @@ single differential check inside networkless Sandbox containers: the literal ``/
 fuzz target must crash under a sanitizer on ``-vul`` and run clean on ``-fix`` using the
 *same* PoC bytes. Nothing here calls the ARVO ``arvo`` replay command, and no part of
 the ground truth (``meta.json``, ``ground_truth.txt``, sanitizer logs, the label) is
-ever passed to a model. ``--validate-only`` (the C1 default) makes zero model calls.
+ever passed to a model: this script makes zero model calls.
 
 Each validated id yields two report folders, both self-contained:
 
     datasets/real/arvo-<id>-with_poc/     attachments/poc.bin present   (label: real)
     datasets/real/arvo-<id>-text_only/    no attachments                (label: real)
 
-C2 fills in ``report.md`` from the crash facts; C1 only proves the pair and copies bytes.
+C1 only proves the pair and copies bytes; ``scripts/gen_real_reports.py`` (C2) writes ``report.md``.
 """
 from __future__ import annotations
 
@@ -29,11 +29,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
 
 from repro import sanitizer
-from repro.prompts import load_prompt, wrap_untrusted
 from repro.sandbox import Sandbox
 from repro.schemas import Target
 from repro.trace import Tracer
@@ -217,21 +215,6 @@ def load_existing(root: Path) -> list[dict]:
     return rows
 
 
-def write_report(row: dict, directory: Path, mode: str, src_dir: str | None, llm) -> None:
-    """C2 only: generate report.md from an allowlist of crash facts (no label, logs or meta)."""
-    user = {key: row[key] for key in ('project', 'function', 'file', 'bug_type', 'fuzz_target')}
-    user['mode'] = mode
-    response = llm.chat([{'role': 'system', 'content': load_prompt('report_from_arvo')},
-                         {'role': 'user', 'content': wrap_untrusted('crash facts', json.dumps(user))}],
-                        response_format={'type': 'json_object'}, temperature=0.4, stage='note')
-    data = json.loads(response.choices[0].message.content)
-    fm = {'id': directory.name, 'title': data['title'], 'source': 'synthetic', 'label': 'real',
-          'target': {'project': row['project'], 'image': row['image'], 'fixed_image': row['fixed_image'],
-                     'src_dir': src_dir or f'/src/{row["project"]}', 'build_cmd': 'arvo compile',
-                     'repro_cmd': None, 'test_cmd': None}}
-    (directory / 'report.md').write_text('---\n' + yaml.safe_dump(fm, sort_keys=False) + '---\n' + data['body'])
-
-
 def main() -> None:
     load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -239,9 +222,8 @@ def main() -> None:
     parser.add_argument('--modes', nargs='+', choices=MODES, default=list(MODES),
                         help='report folders to build per id (default: both)')
     parser.add_argument('--out', default='datasets/real')
-    parser.add_argument('--src-dir', default=None)
     parser.add_argument('--validate-only', action='store_true',
-                        help='C1: prove pairs and lay out folders, zero model calls (report.md is C2)')
+                        help='kept for compatibility; always on (report.md: scripts/gen_real_reports.py)')
     parser.add_argument('--limit', type=int, help='use 2 for the first dry run')
     parser.add_argument('--timeout', type=int, default=60)
     parser.add_argument('--pull', action='store_true',
@@ -262,10 +244,6 @@ def main() -> None:
     modes = tuple(dict.fromkeys(args.modes))
     keep_fix = set(args.keep_fix)
     tracer = Tracer('c1-arvo-validation')
-    llm = None
-    if not args.validate_only:
-        from repro.llm import LLM
-        llm = LLM.cheap(tracer=tracer)
     rows = load_existing(root) if args.skip_validated else []
     done = {r['id'] for r in rows}
     failed = []
@@ -295,10 +273,7 @@ def main() -> None:
                 print(f'[excluded] {aid} {bundle.result["project"]} giant source tree; '
                       f'not counted; free {_free_gb():.0f}GB', flush=True)
                 continue
-            folders = materialize(root, bundle, modes)
-            if llm:
-                for mode, folder in zip(modes, folders, strict=True):
-                    write_report(bundle.result, root / folder, mode, args.src_dir, llm)
+            materialize(root, bundle, modes)
             rows.append(bundle.result)
             done.add(aid)
             if args.free_fix and aid not in keep_fix:
@@ -313,7 +288,7 @@ def main() -> None:
         write_index(root, rows)
         (root / 'rejected.json').write_text(json.dumps(failed, indent=2) + '\n')  # kept current after each id
     print(f'[summary] {len(rows)} validated; {len(failed)} failed; '
-          f'model calls: {llm.usage.calls if llm else 0}', flush=True)
+          'next: python scripts/gen_real_reports.py', flush=True)
 
 
 if __name__ == '__main__':
