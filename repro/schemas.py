@@ -204,6 +204,12 @@ class Verdict(BaseModel):
     winning_attempt: Optional[int] = None
     match: Optional[MatchDetail] = None
     patch: Optional[PatchResult] = None
+    # D4c: outcome of the patch step for a VERIFIED verdict.
+    #   "skipped"   cfg.do_patch is False
+    #   "rejected"  the path filter refused the diff (outside src / protected harness path)
+    #   "failed"    no diff was produced, or validation did not pass in a fresh container
+    #   "validated" the diff applies, builds and stops the crash
+    patch_status: Optional[str] = None
     fixed_confirmed: Optional[bool] = None  # B4: winning attempt replayed on target.fixed_image does NOT crash
     maintainer_markdown: str = ""         # rendered final comment
     cost_usd: float = 0.0

@@ -53,6 +53,7 @@ def triage(report: Report, cfg: Config | None = None, runs_root: str = "runs") -
     tracer = Tracer(run_id, runs_root)
     tracer.log("intake", "report", {"id": report.id, "title": report.title, "project": report.target.project,
                                     "image": report.target.image})
+    tracer.save_artifact("report.md", report.body)   # the demo view renders the report next to the evidence
     llm = LLM.main(tracer)
     claim_llm = LLM.cheap(tracer) if cfg.claim_model == "cheap" else llm
     v = Verdict(report_id=report.id, kind=VerdictKind.ERROR, confidence=0.0, headline="", trace_path=str(tracer.path))
@@ -117,13 +118,27 @@ def triage(report: Report, cfg: Config | None = None, runs_root: str = "runs") -
             kind, conf, win, m = match.decide(claim, fc, tools.attempts)
             v.kind, v.confidence, v.winning_attempt, v.match = kind, conf, win, m
 
-            if kind == VerdictKind.VERIFIED and cfg.do_patch and win:
-                winning = tools.attempts[win - 1]
-                prop = generate_patch(llm, sb, tracer, claim, winning, max_steps=cfg.patch_steps)
-                if prop.get("diff"):
-                    v.patch = validate_patch(report.target, prop["diff"], winning, tools.written, tracer,
-                                             prop.get("regression_test"))
-                    tracer.save_json("patch.json", v.patch)
+            if kind == VerdictKind.VERIFIED:
+                if not cfg.do_patch:
+                    v.patch_status = "skipped"
+                elif win:
+                    winning = tools.attempts[win - 1]
+                    prop = generate_patch(llm, sb, tracer, claim, winning, max_steps=cfg.patch_steps)
+                    diff = prop.get("diff") or ""              # keep the trailing newline: git apply needs it
+                    if not diff.strip():
+                        v.patch_status = "failed"              # the patch agent produced no diff to show
+                    else:
+                        # validate_patch returns None iff the path filter rejected the diff.
+                        v.patch = validate_patch(report.target, diff, winning, tools.written, tracer,
+                                                 prop.get("regression_test"))
+                        if v.patch is None:
+                            v.patch_status = "rejected"
+                        else:
+                            tracer.save_json("patch.json", v.patch)
+                            validated = (v.patch.build_ok and not v.patch.poc_still_crashes
+                                         and v.patch.tests_ok is not False)
+                            v.patch_status = "validated" if validated else "failed"
+                    tracer.log("patch", "status", {"patch_status": v.patch_status})
     except Exception as e:  # infra failure -> ERROR verdict, never a fake verdict
         tracer.log("error", "exception", {"type": type(e).__name__, "msg": str(e)[:2000]})
         v.kind, v.confidence = VerdictKind.ERROR, 0.0

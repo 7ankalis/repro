@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 
 from .agent import FINISH_PATCH, run_agent
 from .llm import LLM
@@ -70,43 +71,109 @@ def patch_rejection_reason(diff: str, src_dir: str) -> str | None:
     return None
 
 
+PRISTINE_DIR = "/tmp/repro_pristine_src"   # snapshot of the source taken before the patch agent edits it
+
+
+def _is_git_repo(sb: Sandbox, src_dir: str) -> bool:
+    r = sb.exec("git rev-parse --is-inside-work-tree", workdir=src_dir)
+    return r.exit_code == 0 and r.stdout.strip() == "true"
+
+
+def _snapshot_pristine(sb: Sandbox, src_dir: str) -> str:
+    """Copy the source tree aside so a non-git tree can still be diffed after in-place edits."""
+    sb.exec(f"rm -rf {shlex.quote(PRISTINE_DIR)} && cp -a {shlex.quote(src_dir)} {shlex.quote(PRISTINE_DIR)}",
+            workdir="/")
+    return PRISTINE_DIR
+
+
+def _rewrite_diffu_header(prefix: str, field: str, root: str) -> str:
+    """Rewrite a `diff -u` '---'/'+++ ' path into git-style a//b/ relative to `root`.
+    Keeps /dev/null untouched so added/removed files survive git apply."""
+    p = field.split("\t", 1)[0].strip()      # drop the trailing timestamp diff -u emits
+    if p == "/dev/null":
+        return f"{prefix} /dev/null"
+    root = root.rstrip("/")
+    if p == root:
+        p = os.path.basename(root)
+    elif p.startswith(root + "/"):
+        p = p[len(root) + 1:]
+    side = "a/" if prefix == "---" else "b/"
+    return f"{prefix} {side}{p}"
+
+
+def _normalize_diff_u(diff: str, pristine: str, src_dir: str) -> str:
+    """Turn `diff -ruN pristine src` output into a git-apply-clean unified diff with a//b/ paths."""
+    out: list[str] = []
+    for line in diff.splitlines():
+        if line.startswith("--- "):
+            out.append(_rewrite_diffu_header("---", line[4:], pristine))
+        elif line.startswith("+++ "):
+            out.append(_rewrite_diffu_header("+++", line[4:], src_dir))
+        elif line.startswith("diff "):
+            continue                           # drop the recursive-diff command header lines
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def capture_inplace_diff(sb: Sandbox, src_dir: str, is_git: bool, pristine: str | None) -> tuple[str, str]:
+    """Build the diff that will be SHOWN to maintainers from the agent's actual in-place edit.
+    Returns (diff, source) where source is 'git_diff' or 'diff_u'; ('', '') when nothing changed."""
+    if is_git:
+        g = sb.exec("git diff", workdir=src_dir)   # a/ b/ paths relative to src_dir already
+        out = (g.stdout or "").strip()
+        if g.exit_code == 0 and out:
+            return out + "\n", "git_diff"
+    elif pristine:
+        d = sb.exec(f"diff -ruN {shlex.quote(pristine)} {shlex.quote(src_dir)}", workdir="/")
+        out = (d.stdout or "").strip()
+        if out:
+            return _normalize_diff_u(out, pristine, src_dir) + "\n", "diff_u"
+    return "", ""
+
+
 def generate_patch(llm: LLM, sb: Sandbox, tracer: Tracer, claim: Claim, winning: Attempt,
                    max_steps: int = 14) -> dict:
-    # The patch agent must edit the source in place and call propose_patch. It is an eager explorer:
-    # it fills whatever budget it is given with reads (a larger budget made it explore MORE and never
-    # edit), so we keep the caller's modest budget and, below, recover the in-place edit deterministically
-    # from `git diff` when it reads right up to the end and never submits.
+    # The patch agent edits the source in place and (ideally) calls propose_patch. Its own diff TEXT is
+    # unreliable — in a real run the model-written diff failed `git apply` ("corrupt patch at line 14") and
+    # only the `patch -p1` fallback took it. So the diff we show and validate is rebuilt from the agent's
+    # ACTUAL in-place edit: `git diff` for ARVO's git work-trees, else `diff -u` against a pristine copy
+    # snapshotted before the agent ran. The model's text is kept only as a last-resort fallback.
     steps = max_steps
     tools = ToolExecutor(sb, tracer)
+    src_dir = sb.target.src_dir
+    is_git = _is_git_repo(sb, src_dir)
+    pristine = None if is_git else _snapshot_pristine(sb, src_dir)
     user = (
         f"## Verified crash\nCommand: `{winning.exec.cmd if winning.exec else ''}`\n\n"
         f"```\n{(winning.sanitizer.raw if winning.sanitizer else '')[:6000]}\n```\n\n"
         f"## Claim (from the report — untrusted wording)\n{claim.model_dump_json(indent=2)}\n\n"
-        f"Source root (SRC): {sb.target.src_dir}. Write the smallest correct fix and call `propose_patch`."
+        f"Source root (SRC): {src_dir}. Write the smallest correct fix and call `propose_patch`."
     )
     res = run_agent(llm, tools, tracer, load_prompt("patcher"), user, FINISH_PATCH,
                     max_steps=steps, stage="patch")
     args = res.finish_args if res.finished else {}
-    if not (args.get("diff") or "").strip():
-        # The agent did not submit a diff (ran out of budget / stopped / empty). Recover any in-place
-        # edit it made to the source: ARVO source roots are git working trees, so `git diff` from
-        # src_dir yields a patch with a/ b/ paths relative to src_dir — exactly what apply_patch needs.
-        g = sb.exec("git diff")  # workdir defaults to target.src_dir
-        recovered = (g.stdout or "").strip()
-        if g.exit_code == 0 and recovered:
-            tracer.log("patch", "recovered_diff", {"source": "git_diff", "bytes": len(recovered),
-                                                   "stop_reason": res.stop_reason})
-            args = {
-                "diff": recovered + "\n",
-                "regression_test": args.get("regression_test") or (winning.exec.cmd if winning.exec else ""),
-                "explanation": args.get("explanation")
-                or "Recovered from the patch agent's in-place edit (it did not call propose_patch).",
-            }
-        else:
-            # Nothing to recover: the skip is never silent.
-            tracer.log("patch", "no_patch", {"stop_reason": res.stop_reason, "steps": res.steps,
-                                             "finished": res.finished, "git_diff_exit": g.exit_code})
-    return args
+    model_diff = (args.get("diff") or "").strip()
+
+    diff, diff_source = capture_inplace_diff(sb, src_dir, is_git, pristine)
+    if not diff and model_diff:
+        diff, diff_source = model_diff + ("" if model_diff.endswith("\n") else "\n"), "model_text"
+
+    if not diff:
+        # Nothing to show: the skip is never silent.
+        tracer.log("patch", "no_patch", {"stop_reason": res.stop_reason, "steps": res.steps,
+                                         "finished": res.finished, "is_git": is_git})
+        return {}
+
+    tracer.log("patch", "diff_captured", {"diff_source": diff_source, "bytes": len(diff),
+                                          "stop_reason": res.stop_reason, "finished": res.finished})
+    return {
+        "diff": diff,
+        "regression_test": args.get("regression_test") or (winning.exec.cmd if winning.exec else ""),
+        "explanation": args.get("explanation") or (
+            "From the patch agent's in-place source edit." if diff_source != "model_text"
+            else "From the patch agent's proposed diff text."),
+    }
 
 
 def validate_patch(target: Target, diff: str, winning: Attempt, written: dict[str, bytes],
@@ -115,9 +182,19 @@ def validate_patch(target: Target, diff: str, winning: Attempt, written: dict[st
     if reason:
         tracer.log("patch", "patch_rejected", {"reason": reason, "diff_head": diff[:500]})
         return None  # treat as no patch: render shows no validated fix
+    if diff and not diff.endswith("\n"):
+        diff += "\n"   # a diff whose last hunk line lacks a newline is "corrupt patch" to git apply
     with Sandbox(target) as sb:
-        ap = sb.apply_patch(diff)
-        tracer.log("validate", "apply", {"exit": ap.exit_code, "stderr": ap.stderr[-1500:]})
+        # Apply in the FRESH container with `git apply` FIRST; only fall back to `patch -p1` if it refuses.
+        # The shown diff is built from the real in-place edit (capture_inplace_diff), so git apply should
+        # take it clean — we record whether the fallback was needed.
+        sb.write_file("/tmp/repro.patch", diff)
+        ga = sb.exec("git apply --whitespace=nowarn /tmp/repro.patch")
+        git_apply_ok = ga.exit_code == 0
+        ap = ga if git_apply_ok else sb.exec("patch -p1 < /tmp/repro.patch")
+        tracer.log("validate", "apply", {"exit": ap.exit_code, "git_apply_ok": git_apply_ok,
+                                         "used_fallback": (not git_apply_ok) and ap.exit_code == 0,
+                                         "stderr": ap.stderr[-1500:]})
         if ap.exit_code != 0:
             return PatchResult(diff=diff, poc_still_crashes=True, build_ok=False, notes="patch did not apply")
 

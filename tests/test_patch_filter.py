@@ -54,6 +54,8 @@ def test_recovered_git_diff_touching_build_sh_is_rejected(tmp_path):
         target = Target(project="muparser", image="img", src_dir=SRC)
 
         def exec(self, cmd, timeout=120, workdir=None):
+            if cmd.strip() == "git rev-parse --is-inside-work-tree":
+                return ExecResult(cmd=cmd, exit_code=0, stdout="true", stderr="", duration_s=0.1)
             out = build_sh_diff if cmd.strip() == "git diff" else ""
             return ExecResult(cmd=cmd, exit_code=0, stdout=out, stderr="", duration_s=0.1)
 

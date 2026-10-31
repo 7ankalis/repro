@@ -1,10 +1,36 @@
 """Render a Verdict as the maintainer-facing markdown comment (GitHub issue / dashboard). Deterministic."""
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Optional
 
 from .schemas import StackFrame, Verdict, VerdictKind
+
+_NO_PATCH_NOTE = ("No validated patch produced — the patch step did not return a diff that applies, "
+                  "builds and stops the crash in a fresh container. The crash evidence above still stands.")
+
+
+def _patch_failure_reason(v: Verdict) -> Optional[str]:
+    """Best-effort human reason for a 'failed'/'rejected' patch, pulled from the run trace.
+    Returns None when nothing useful is recorded (the note then stands on its own)."""
+    try:
+        lines = Path(v.trace_path).read_text(encoding="utf-8").splitlines()
+    except (OSError, ValueError):
+        lines = []
+    for line in reversed(lines):                      # most recent wins
+        try:
+            ev = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        data = ev.get("data") or {}
+        if ev.get("stage") == "patch" and ev.get("kind") == "patch_rejected" and data.get("reason"):
+            return str(data["reason"])
+    # Failed validation (not a rejection): the PatchResult already carries the reason.
+    if v.patch and v.patch.notes and v.patch.notes != "validated in fresh container":
+        return v.patch.notes
+    return None
 
 ICON = {
     VerdictKind.VERIFIED: "✅", VerdictKind.DIFFERENT_BUG: "⚠️", VerdictKind.INVALID_CLAIM: "❌",
@@ -57,7 +83,11 @@ def render(v: Verdict) -> str:
             L.append("✔ The same attempt does **not** crash on the upstream fixed version.\n" if v.fixed_confirmed
                      else "⚠️ The same attempt also crashes on the upstream fixed version.\n")
 
-    if v.patch:
+    # Patch section. patch_status (D4c) decides what a VERIFIED verdict shows; when it is unset
+    # (legacy verdicts / direct construction) we fall back to the presence of a PatchResult.
+    if v.patch_status == "skipped":
+        pass  # patching was turned off for this run — say nothing about a fix
+    elif v.patch is not None and v.patch_status != "failed":
         p = v.patch
         status = "✅ validated" if (p.build_ok and not p.poc_still_crashes and p.tests_ok is not False) else "⚠️ not validated"
         L.append(f"### Proposed fix ({status})")
@@ -66,8 +96,8 @@ def render(v: Verdict) -> str:
         L.append("```diff\n" + p.diff[:6000] + "\n```")
     elif v.kind == VerdictKind.VERIFIED:
         L.append("### Proposed fix")
-        L.append("No validated patch produced — the patch step did not return a diff that applies, "
-                 "builds and stops the crash in a fresh container. The crash evidence above still stands.")
+        reason = _patch_failure_reason(v)
+        L.append(_NO_PATCH_NOTE + (f"\n\nReason: {reason}" if reason else ""))
 
     if v.kind == VerdictKind.NOT_REPRODUCED:
         L.append("> Not reproduced ≠ not vulnerable. All attempts are in the evidence trace; "

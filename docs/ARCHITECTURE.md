@@ -41,6 +41,7 @@ load_report() ─► Report
         early_stop when match_claim(...).score ≥ 0.75
   match.decide(claim, fc, attempts) ─► (kind, confidence, winning, MatchDetail)
   if VERIFIED: generate_patch() ─► validate_patch() in a fresh container ─► PatchResult
+               verdict.patch_status ∈ {skipped, rejected, failed, validated}
   render(verdict) ─► comment.md ; verdict.json
 ```
 
@@ -48,6 +49,7 @@ load_report() ─► Report
 ```
 trace.jsonl            every event (TraceEvent)
 claim.json  factcheck.json  patch.json  verdict.json
+report.md              the raw report body (saved at intake; the demo view renders it beside the evidence)
 comment.md             what the maintainer sees
 attempt_N_sanitizer.txt
 files/                 every file the agent wrote (harnesses, PoC inputs)
@@ -63,6 +65,9 @@ files/                 every file the agent wrote (harnesses, PoC inputs)
 | Agent may not modify source during reproduction | Otherwise it could "create" the bug. Enforced by prompt + reviewed in trace. (Stretch: diff `/src` before/after.) |
 | `CodeRef.kind` before-validator maps unknown kinds → `variable` (A10) | The claim-extractor model sometimes emits a kind outside the enum (e.g. `identifier`); LLM-JSON retries can't fix it. Coercing identifier-like kinds keeps the whole Claim from failing validation. No field renamed/removed. |
 | Patch validated in a FRESH container | The agent can't fake validation by leaving state behind. |
+| Shown diff rebuilt from the agent's in-place edit (`git diff`, else `diff -u` vs a pristine copy); model diff text only as fallback. `diff_source` ∈ `git_diff`\|`diff_u`\|`model_text` logged to the trace. | The model's own diff text is unreliable (a real run hit `git apply: corrupt patch at line 14`); the in-place edit reproduced from the source is git-apply-clean. |
+| `validate_patch` applies with `git apply` FIRST, `patch -p1` only as fallback; `git_apply_ok`/`used_fallback` logged. | The maintainer-facing diff must apply cleanly with stock `git apply`; the fallback is a safety net, not the path. |
+| `Verdict.patch_status` (optional): `skipped` (patching off) / `rejected` (path filter) / `failed` (no diff or validation not ok) / `validated`. render shows the diff only for `validated`, the "No validated patch produced" note (with the trace reason) for `failed`/`rejected`, and nothing for `skipped`. | Separates "we chose not to patch" from "we tried and it didn't hold" in the maintainer comment and the demo view. |
 | Evidence trace is a first-class output | Maintainers (and judges) can audit every step. |
 
 ## Extension points (stretch)
