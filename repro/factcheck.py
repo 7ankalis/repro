@@ -93,6 +93,28 @@ class FactChecker:
 
         return RefCheck(ref=ref, exists=False, evidence=f"unsupported ref kind {ref.kind}")
 
+    def _check_pair(self, function: str, file: str) -> Optional[RefCheck]:
+        """Check occurrences, including prototypes and calls, in the claimed source file."""
+        name = function.split("::")[-1].split("(")[0].strip()
+        hits = self._find_file(file)
+        if not hits or not _IDENT.fullmatch(name):
+            return None  # individual checks already describe missing files/invalid names
+        pattern = shlex.quote(rf"\b{re.escape(name)}\b")
+        paths = " ".join(shlex.quote(p) for p in hits)
+        result = self.sb.exec(f"grep -Il -E -- {pattern} {paths}", timeout=60, workdir="/")
+        if result.exit_code == 0:
+            return None
+        if result.exit_code != 1:
+            raise RuntimeError(f"Unable to check function/file pair: grep exited {result.exit_code}")
+        locations = self.sb.exec(
+            f"grep -rIl -E {SRC_GLOBS} -- {pattern} {shlex.quote(self.src)} | head -3",
+            timeout=120, workdir="/",
+        )
+        prefix = self.src.rstrip("/") + "/"
+        files = [p.removeprefix(prefix) for p in locations.stdout.splitlines() if p.strip()][:3]
+        evidence = f"'{function}' does not appear in {file}; it appears in: {', '.join(files) or '(none)'}"
+        return RefCheck(ref=CodeRef(kind="function", name=function, file=file), exists=False, evidence=evidence)
+
     def check_quoted_code(self, quoted: str) -> bool:
         """True if the most distinctive line of quoted code exists verbatim (whitespace-normalized)."""
         lines = [re.sub(r"\s+", " ", ln).strip() for ln in quoted.splitlines()]
@@ -136,6 +158,15 @@ class FactChecker:
                     continue
             source_refs.append(ref)
         checks = [self.check_ref(r) for r in source_refs]
+        # Use the filtered source checks so attachments and runtime paths cannot form a pair.
+        function_exists = any(c.exists and c.ref.kind == "function" and c.ref.name == claim.affected_function
+                              for c in checks)
+        file_exists = any(c.exists and c.ref.kind == "file" and c.ref.name == claim.affected_file
+                          for c in checks)
+        if function_exists and file_exists:
+            pair = self._check_pair(claim.affected_function, claim.affected_file)
+            if pair is not None:
+                checks.append(pair)
         missing = [c for c in checks if not c.exists]
         ratio = len(missing) / len(checks) if checks else 0.0
 
@@ -146,6 +177,9 @@ class FactChecker:
 
         signals = []
         for c in missing:
+            if c.ref.kind == "function" and c.ref.file:
+                signals.append(c.evidence)
+                continue
             hint = f" (closest real symbol: {c.nearest_match})" if c.nearest_match else ""
             signals.append(f"Cited {c.ref.kind} '{c.ref.name}' does not exist in the source tree{hint}.")
         if quoted_ok is False:

@@ -287,3 +287,97 @@ def test_line_ref_explicit_file_and_invalid_number():
     fc = FactChecker(FakeSourceSandbox()).run(claim)
     assert [c.exists for c in fc.checks] == [True, False]
     assert fc.hallucination_ratio == 0.5
+
+
+class FakePairSandbox:
+    """Interpret only the source-search commands used by the pair checker."""
+    def __init__(self, claimed_text):
+        from repro.schemas import Target
+        self.target = Target(project='curl', image='unused', src_dir='/src/curl')
+        self.files = {
+            '/src/curl/lib/http_digest.h': claimed_text,
+            '/src/curl/lib/dynhds.c': 'void Curl_dynhds_add(void) {}',
+            '/src/curl/lib/dynhds.h': 'void Curl_dynhds_add(void);',
+            '/src/curl/lib/other.c': 'Curl_dynhds_add();',
+            '/src/curl/lib/fourth.c': 'Curl_dynhds_add();',
+        }
+        self.commands = []
+        self.grep_error = False
+
+    def exec(self, cmd, **kwargs):
+        import re
+        import shlex
+        self.commands.append(cmd)
+        args = shlex.split(cmd)
+        code = 0
+        if args[0] == 'find':
+            out = '\n'.join(p for p in self.files if p.rsplit('/', 1)[-1] == args[args.index('-name') + 1])
+        elif args[0] == 'grep':
+            separator = args.index('--')
+            pattern = args[separator + 1]
+            if '-rIl' in args:
+                hits = [p for p, text in self.files.items() if re.search(pattern, text)]
+                out = str(len(hits)) if 'wc' in args else '\n'.join(hits[:3])
+            else:
+                hits = [p for p in args[separator + 2:] if re.search(pattern, self.files[p])]
+                out = '\n'.join(hits)
+                code = 2 if self.grep_error else (0 if hits else 1)
+        else:
+            raise AssertionError(cmd)
+        return ExecResult(cmd=cmd, exit_code=code, stdout=out, stderr='', duration_s=0)
+
+
+def _pair_claim(file='lib/http_digest.h'):
+    return Claim(summary='s', bug_class=BugClass.heap_buffer_overflow,
+                 affected_function='Curl_dynhds_add', affected_file=file, trigger_description='t', has_poc=True)
+
+
+def test_function_in_wrong_file_is_missing_key():
+    from repro.factcheck import FactChecker
+    fc = FactChecker(FakePairSandbox('void unrelated(void);')).run(_pair_claim())
+    assert [c.exists for c in fc.checks] == [True, True, False]
+    pair = fc.checks[-1]
+    assert pair.ref.name == 'Curl_dynhds_add' and pair.ref.file == 'lib/http_digest.h'
+    assert pair.evidence == ("'Curl_dynhds_add' does not appear in lib/http_digest.h; it appears in: "
+                             'lib/dynhds.c, lib/dynhds.h, lib/other.c')
+    assert pair.evidence in fc.slop_signals
+    assert fc.hallucination_ratio == 0.333  # below the general threshold; missing key must still reject
+    assert decide(_pair_claim(), fc, [])[0] == VerdictKind.INVALID_CLAIM
+
+
+def test_function_in_right_file_definition_prototype_and_call():
+    from repro.factcheck import FactChecker
+    for text in ('void Curl_dynhds_add(void) {}', 'void Curl_dynhds_add(void);',
+                 'void caller(void) { Curl_dynhds_add(); }'):
+        fc = FactChecker(FakePairSandbox(text)).run(_pair_claim())
+        assert all(c.exists for c in fc.checks) and fc.hallucination_ratio == 0
+        assert decide(_pair_claim(), fc, [])[0] == VerdictKind.NOT_REPRODUCED
+    # Substrings of a different identifier do not count as an occurrence.
+    fc = FactChecker(FakePairSandbox('void Curl_dynhds_add_extra(void);')).run(_pair_claim())
+    assert fc.checks[-1].exists is False
+
+
+def test_crash_beats_missing_function_file_pair():
+    from repro.factcheck import FactChecker
+    claim = _pair_claim()
+    fc = FactChecker(FakePairSandbox('void unrelated(void);')).run(claim)
+    assert decide(claim, fc, [])[0] == VerdictKind.INVALID_CLAIM
+    log = ASAN_HBO.replace('xmlParseCharRef', 'Curl_dynhds_add')
+    assert decide(claim, fc, [_attempt(log)])[0] == VerdictKind.VERIFIED
+    assert decide(claim, fc, [_attempt(ASAN_HBO)])[0] == VerdictKind.DIFFERENT_BUG
+
+
+def test_pair_excludes_non_source_refs_and_requires_individual_matches():
+    from repro.factcheck import FactChecker
+    for file, attachments in (('/out/set_eval_fuzzer', []), ('/work/report/poc.bin', []),
+                              ('lib/http_digest.h', ['lib/http_digest.h']), ('missing.h', [])):
+        sb = FakePairSandbox('void unrelated(void);')
+        fc = FactChecker(sb).run(_pair_claim(file), attachments=attachments)
+        assert not any(c.ref.kind == 'function' and c.ref.file for c in fc.checks)
+        assert not any(cmd.startswith('grep -Il') for cmd in sb.commands)
+    # Failed searches are infrastructure errors, not evidence of a wrong file.
+    import pytest
+    sb = FakePairSandbox('void unrelated(void);')
+    sb.grep_error = True
+    with pytest.raises(RuntimeError, match='grep exited 2'):
+        FactChecker(sb).run(_pair_claim())
