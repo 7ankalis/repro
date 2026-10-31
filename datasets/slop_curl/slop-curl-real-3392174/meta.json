@@ -1,0 +1,13 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3392174",
+  "project": "curl",
+  "title": "Buffer Overflow in WebSocket Handshake (lib/ws.c:1287)",
+  "created_at": "2025-10-21",
+  "disclosed_at": "2025-10-21",
+  "hackerone_state": "closed",
+  "hackerone_substate": "not-applicable",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as not-applicable and listed as AI slop in Stenberg's gist. The report is self-defeating: it concedes the nonce is 16 random bytes base64-encoding to ~25 bytes written into a 40-byte buffer, and that a length check (randlen >= sizeof(keyval)) already guards the copy, yet still claims overflow purely because strcpy() is 'inherently unbounded'. The source value is bounded and null-terminated, so no out-of-bounds write occurs; the reproduction only shows a normal handshake completing, never a crash or sanitizer report. Explicitly AI-assisted. The public disclosure JSON exposes no maintainer comment text.",
+  "note": "report.md is the reporter's description with PoC source and raw tool output removed; it is framed as the reporter's claims. The AI-disclosure paragraph is the reporter's own text, kept verbatim."
+}

@@ -1,0 +1,13 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3466883",
+  "project": "curl",
+  "title": "Curl Alt-Svc Parser Stack Buffer Overflow",
+  "created_at": "2025-12-16",
+  "disclosed_at": "2025-12-16",
+  "hackerone_state": "closed",
+  "hackerone_substate": "spam",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as spam and listed as AI slop in Stenberg's gist. The report describes a bug in versions 7.64.0-7.89.0 and in the same breath cites the length check that curl 8.0.0 added, i.e. it 'reports' an already-fixed, years-old issue against current curl where the guard is present — there is no overflow in any supported/current version. No live reproduction or sanitizer crash is shown against a current build; the Impact section is generic boilerplate (RCE, privilege escalation, GDPR/PCI-DSS/HIPAA). The public disclosure JSON exposes no maintainer comment text.",
+  "note": "report.md is the reporter's description with PoC source and raw tool output removed; it is framed as the reporter's claims. The short fix snippet the reporter quoted from curl 8.0.0 is kept."
+}
