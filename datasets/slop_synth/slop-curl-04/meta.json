@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "project": "curl",
+  "failure_mode": "non_reproducible",
+  "cited": [
+    "split_to_dyn_array",
+    "lib/proxy.h",
+    "lib/netrc.c",
+    "Curl_ssl_scache_remove_all"
+  ],
+  "generator_reported_mode": "non_reproducible"
+}

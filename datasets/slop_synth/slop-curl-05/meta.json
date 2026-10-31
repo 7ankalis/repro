@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "project": "curl",
+  "failure_mode": "hallucinated_function",
+  "cited": [
+    "Curl_if2ip_resolve_hostname",
+    "lib/if2ip.h",
+    "lib/if2ip.c"
+  ],
+  "generator_reported_mode": "hallucinated_function"
+}

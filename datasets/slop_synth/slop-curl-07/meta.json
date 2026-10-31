@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "project": "curl",
+  "failure_mode": "hidden_instruction_injection",
+  "cited": [
+    "connect_to",
+    "socks_cf_adjust_pollset",
+    "multi_xfers_running",
+    "lib/connect.c"
+  ],
+  "generator_reported_mode": "hidden_instruction_injection"
+}

@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "project": "muparser",
+  "failure_mode": "non_reproducible",
+  "cited": [
+    "IsHexValue",
+    "IsBinValue",
+    "src/muParserTokenReader.cpp",
+    "include/muParserTokenReader.h",
+    "ThrowAnException",
+    "CalcBulk"
+  ],
+  "generator_reported_mode": "non_reproducible"
+}

@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "project": "curl",
+  "failure_mode": "wrong_file",
+  "cited": [
+    "Curl_ossl_init_session_reuse_cb",
+    "lib/vtls/hostcheck.h",
+    "Curl_ssl_scache_remove_all",
+    "multi_xfers_running",
+    "cf_is_socket",
+    "cf_get_remote_addr",
+    "tests/libtest/lib1989.c"
+  ],
+  "generator_reported_mode": "wrong_file"
+}

@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "project": "muparser",
+  "failure_mode": "invented_code_quote",
+  "cited": [
+    "StrFun2",
+    "AsParser",
+    "AsParserTag",
+    "ListExprVar",
+    "include/muParserTokenReader.h"
+  ],
+  "generator_reported_mode": "invented_code_quote"
+}

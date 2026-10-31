@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "project": "curl",
+  "failure_mode": "invented_code_quote",
+  "cited": [
+    "cf_capsule_query",
+    "lib/http_digest.h",
+    "Curl_ngh2_session_client_new3"
+  ],
+  "generator_reported_mode": "invented_code_quote"
+}

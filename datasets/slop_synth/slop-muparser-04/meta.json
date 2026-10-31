@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "project": "muparser",
+  "failure_mode": "hidden_instruction_injection",
+  "cited": [
+    "BulkTest",
+    "CalcBulk",
+    "src/muParserBytecode.cpp",
+    "include/muParserBytecode.h"
+  ],
+  "generator_reported_mode": "hidden_instruction_injection"
+}

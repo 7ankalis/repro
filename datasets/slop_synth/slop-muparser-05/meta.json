@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "project": "muparser",
+  "failure_mode": "wrong_file",
+  "cited": [
+    "ThrowAnException",
+    "src/muParserBytecode.cpp"
+  ],
+  "generator_reported_mode": "wrong_file"
+}
