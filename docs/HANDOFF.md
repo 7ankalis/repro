@@ -21,3 +21,7 @@
 ## Cross-area requests
 <!-- format: - [ ] (from task ID → area or human) what + why -->
 - [x] (B4 → human) add `fixed_confirmed: Optional[bool] = None` to `Verdict` for task B4. Done in starter repo.
+- [x] (D4 → area A) Patch budget: keep `pipeline.Config.patch_steps` modest (14). The patch agent is an eager
+  explorer — a larger budget made it explore more and never edit. `patch.generate_patch` now recovers the agent's
+  in-place source edit via `git diff` from `src_dir` (ARVO roots are git working trees) when it reads to the end
+  without calling `propose_patch`, so no extra budget is needed. No area-A change required.
