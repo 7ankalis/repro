@@ -1,0 +1,12 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/2981245",
+  "project": "curl",
+  "title": "(\"possible\") UAF",
+  "created_at": "2025-02-07",
+  "disclosed_at": "2025-02-08",
+  "hackerone_state": "closed",
+  "hackerone_substate": "not-applicable",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as not-applicable and listed as AI slop in Stenberg's gist. The 'PoC' is a standalone toy program that deliberately uses a pointer after free() and even prints a changed stream_id that its own code never sets; it does not exercise curl's cf_h2_proxy_ctx_free at all, and the reporter states they are a beginner and that the report was AI-assisted. The public disclosure JSON exposes no maintainer comment text."
+}

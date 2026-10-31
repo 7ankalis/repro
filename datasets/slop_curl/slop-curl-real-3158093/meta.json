@@ -1,0 +1,12 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3158093",
+  "project": "curl",
+  "title": "Memory Leak in libcurl via Location Header Handling (CWE-770)",
+  "created_at": "2025-05-22",
+  "disclosed_at": "2025-05-22",
+  "hackerone_state": "closed",
+  "hackerone_substate": "spam",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as spam and listed as AI slop in Stenberg's gist. The reporter's own Valgrind run shows 0 bytes definitely lost (no leak), and the claimed leak rests on a code-analysis narrative that misreads curl's request-reset path; the report is explicitly AI-assisted. The public disclosure JSON exposes no maintainer comment text."
+}

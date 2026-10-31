@@ -1,0 +1,13 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3399774",
+  "project": "curl",
+  "title": "Integer Overflow to Heap Overflow in DoH Response Handling",
+  "created_at": "2025-10-25",
+  "disclosed_at": "2025-10-25",
+  "hackerone_state": "closed",
+  "hackerone_substate": "not-applicable",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as not-applicable and listed as AI slop in Stenberg's gist. The claim is bogus: the PoC never drives libcurl — it copies doh_probe_write_cb plus a stripped reimplementation of the dynbuf helpers into a standalone file and calls it with size=1, nmemb=SIZE_MAX, so the crash is in the reporter's own reimplemented code. Real curl cannot reach this: size*nmemb come from the transfer layer (bounded by CURL_MAX_WRITE_SIZE, never SIZE_MAX), and curl's actual dyn_nappend checks the length against its 'too big' ceiling before adding, which the PoC bypasses. No crash is demonstrated against curl. The public disclosure JSON exposes no maintainer comment text.",
+  "note": "report.md is the reporter's description with PoC source and raw tool output removed; it is framed as the reporter's claims."
+}

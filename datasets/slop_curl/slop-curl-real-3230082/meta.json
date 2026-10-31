@@ -1,0 +1,13 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3230082",
+  "project": "curl",
+  "title": "Stack-based Buffer Overflow in TELNET NEW_ENV Option Handling",
+  "created_at": "2025-06-30",
+  "disclosed_at": "2025-06-30",
+  "hackerone_state": "closed",
+  "hackerone_substate": "spam",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as spam and listed as AI slop in Stenberg's gist. The claimed overflow of the 2048-byte temp buffer in telnet.c suboption() is bogus: the environment data is attacker-/user-supplied via CURLOPT_TELNETOPTIONS (not the remote server), and the quoted length check plus msnprithf's own bound prevent the described out-of-bounds write. No crash is actually demonstrated. The public disclosure JSON exposes no maintainer comment text.",
+  "note": "report.md reproduces the reporter's large filler 'A' payload strings; exact character counts of the filler may differ slightly from the original submission but the content is otherwise verbatim."
+}

@@ -1,0 +1,13 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3459636",
+  "project": "curl",
+  "title": "Stack Buffer Overflow in cURL wolfSSL Backend (lib/vtls/wolfssl.c)",
+  "created_at": "2025-12-09",
+  "disclosed_at": "2025-12-09",
+  "hackerone_state": "closed",
+  "hackerone_substate": "not-applicable",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as not-applicable and listed as AI slop in Stenberg's gist. The claim is bogus: the PoC never calls libcurl — it reimplements a strcpy-into-a-12-byte-buffer pattern in a standalone program and ASan flags that program's own overflow. In the real wssl_strerror the source strings are curl's own fixed, bounded literals copied into an adequately sized caller buffer, not attacker-controlled data, so no runtime overflow exists even with DEBUGASSERT compiled out. No crash is demonstrated against curl. The public disclosure JSON exposes no maintainer comment text.",
+  "note": "report.md is the reporter's description with PoC source and raw AddressSanitizer output removed; it is framed as the reporter's claims."
+}

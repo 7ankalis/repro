@@ -25,3 +25,12 @@
   explorer — a larger budget made it explore more and never edit. `patch.generate_patch` now recovers the agent's
   in-place source edit via `git diff` from `src_dir` (ARVO roots are git working trees) when it reads to the end
   without calling `propose_patch`, so no extra budget is needed. No area-A change required.
+
+## [C4] real curl slop dataset — `source` value
+- Who: C4 (datasets/slop_curl).
+- What: BUILD_PLAN/C4 brief asked for front matter `source: hackerone-disclosed`, but
+  `schemas.py::Report.source` is `Literal["github","file","hackerone_export","synthetic"]` and rejects it.
+- Done instead: used the existing `source: hackerone_export` (semantically a HackerOne report); the
+  public-disclosure URL + dates + rejection rationale live in each folder's `meta.json`.
+- If desired: a Human could add a `"hackerone_disclosed"` literal to `Report.source`; then flip the
+  front matter + `tests/test_slop_curl_dataset.py` assertion. Not required for the eval to work.

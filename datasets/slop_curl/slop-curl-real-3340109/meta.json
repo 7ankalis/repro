@@ -1,0 +1,13 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3340109",
+  "project": "curl",
+  "title": "Stack Buffer Overflow in cURL Cookie Parsing Leads to RCE",
+  "created_at": "2025-09-16",
+  "disclosed_at": "2025-09-16",
+  "hackerone_state": "closed",
+  "hackerone_substate": "not-applicable",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as not-applicable and listed as AI slop in Stenberg's gist. The claim is bogus: the only demonstration is a standalone test program that fills an 8192-byte local array with no null terminator and then calls strlen() on it — AddressSanitizer flags the reporter's own out-of-bounds read, not any code path in libcurl's cookie parser. curl bounds cookie length (CURL_MAX_HTTP_HEADER / per-cookie limits) and does not strlen() unterminated attacker data, so no overflow exists in curl. The report is explicitly fuzzing/AI-assisted narrative with no curl crash. The public disclosure JSON exposes no maintainer comment text.",
+  "note": "report.md is the reporter's description with PoC source and raw AddressSanitizer output removed; it is framed as the reporter's claims."
+}

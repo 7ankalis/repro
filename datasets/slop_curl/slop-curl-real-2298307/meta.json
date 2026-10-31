@@ -1,0 +1,12 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/2298307",
+  "project": "curl",
+  "title": "Buffer Overflow Vulnerability in WebSocket Handling",
+  "created_at": "2023-12-28",
+  "disclosed_at": "2024-01-02",
+  "hackerone_state": "closed",
+  "hackerone_substate": "not-applicable",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as not-applicable and listed as AI slop in Stenberg's gist. The report alleges a strcpy buffer overflow in curl's WebSocket code (lib/ws.c) but cites no attacker-controlled input and no working PoC; the public disclosure JSON exposes no maintainer comment text. This report is the WebSocket strcpy example Stenberg discusses in 'The I in LLM stands for Intelligence' (https://daniel.haxx.se/blog/2024/01/02/the-i-in-llm-stands-for-intelligence/)."
+}

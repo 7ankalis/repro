@@ -1,0 +1,12 @@
+{
+  "source": "hackerone-disclosed",
+  "url": "https://hackerone.com/reports/3117697",
+  "project": "curl",
+  "title": "Double Free Vulnerability in libcurl Cookie Management (cookie.c)",
+  "created_at": "2025-04-29",
+  "disclosed_at": "2025-04-29",
+  "hackerone_state": "closed",
+  "hackerone_substate": "not-applicable",
+  "classified_slop_by": "Daniel Stenberg gist 07f7581f6e3d78ef37dfbfc81fd1d1cd (AI slop security reports submitted to curl)",
+  "why_rejected": "Closed on HackerOne as not-applicable and listed as AI slop in Stenberg's gist. Claims two double-frees in cookie.c but the quoted paths free an element exactly once (freecookie after Curl_node_remove) or free a freshly allocated cookie on the error path; no sequence is shown that frees the same pointer twice, and no working PoC is provided. The public disclosure JSON exposes no maintainer comment text."
+}
