@@ -1,0 +1,22 @@
+{
+  "_note": "SAMPLE / ILLUSTRATIVE NUMBERS ONLY - not real results. Same shape as runs/eval_comparison.json written by repro/eval.py::write_comparison. Used to build and test the chart before task C6 produces real numbers.",
+  "methods": {
+    "repro": {
+      "n_real": 20, "n_slop": 20,
+      "real_confirmed": 11, "real_confirmed_pct": 55.0,
+      "slop_rejected": 19, "slop_rejected_pct": 95.0,
+      "false_verified_on_slop": 0,
+      "median_cost_usd": 0.42, "total_cost_usd": 9.8,
+      "errors": 1
+    },
+    "llm_judge": {
+      "n_real": 20, "n_slop": 20,
+      "real_confirmed": 17, "real_confirmed_pct": 85.0,
+      "slop_rejected": 9, "slop_rejected_pct": 45.0,
+      "false_verified_on_slop": 11,
+      "median_cost_usd": 0.004, "total_cost_usd": 0.09,
+      "errors": 0
+    }
+  },
+  "same_reports": true
+}
