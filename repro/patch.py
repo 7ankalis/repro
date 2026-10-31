@@ -7,6 +7,9 @@ A patch is only reported as VALID if, in a FRESH container:
 """
 from __future__ import annotations
 
+import os
+import re
+
 from .agent import FINISH_PATCH, run_agent
 from .llm import LLM
 from . import sanitizer
@@ -15,6 +18,56 @@ from .sandbox import Sandbox
 from .schemas import Attempt, Claim, PatchResult, Target
 from .tools import ToolExecutor
 from .trace import Tracer
+
+# A fix may only touch project source under target.src_dir. These paths are off-limits even
+# when they sit inside src_dir: editing the fuzz harness or build files lets a patch "fix" the
+# bug by changing how it is reached, not by fixing the code.
+PROTECTED_PATTERNS = (
+    re.compile(r"fuzz", re.IGNORECASE),     # any fuzz harness file (set_eval_fuzzer.cc, *_fuzzer.c, ...)
+    re.compile(r"(^|/)build\.sh$"),         # OSS-Fuzz build script
+    re.compile(r"\.options$"),              # libFuzzer .options
+    re.compile(r"\.dict$"),                 # fuzzer dictionary
+    re.compile(r"(^|/)(out|work)(/|$)"),    # /out fuzz targets, /work scratch
+)
+
+
+def _strip_ab(path: str) -> str:
+    """Drop a leading git a/ or b/ prefix and a trailing diff timestamp."""
+    path = path.split("\t", 1)[0].strip()
+    if path[:2] in ("a/", "b/"):
+        path = path[2:]
+    return path
+
+
+def diff_paths(diff: str) -> set[str]:
+    """File paths named by a unified or git diff (---/+++ and 'diff --git' lines), minus /dev/null."""
+    paths: set[str] = set()
+    for line in diff.splitlines():
+        if line.startswith(("--- ", "+++ ")):
+            paths.add(_strip_ab(line[4:]))
+        elif line.startswith("diff --git "):
+            paths.update(_strip_ab(tok) for tok in line.split()[2:4])
+    paths.discard("/dev/null")
+    return {p for p in paths if p}
+
+
+def patch_rejection_reason(diff: str, src_dir: str) -> str | None:
+    """Why the diff must be refused before any container touches it, or None if it is allowed.
+
+    Applies to every diff we might validate (the agent's propose_patch diff and any
+    git-diff-recovered variant): reject paths outside src_dir or matching PROTECTED_PATTERNS.
+    """
+    base = os.path.normpath(src_dir)
+    paths = diff_paths(diff)
+    if not paths:
+        return "diff names no file paths"
+    for p in sorted(paths):
+        full = os.path.normpath(p if p.startswith("/") else os.path.join(base, p))
+        if not (full == base or full.startswith(base.rstrip("/") + "/")):
+            return f"path outside source root {src_dir}: {p}"
+        if any(rx.search(full) for rx in PROTECTED_PATTERNS):
+            return f"protected harness/build path: {p}"
+    return None
 
 
 def generate_patch(llm: LLM, sb: Sandbox, tracer: Tracer, claim: Claim, winning: Attempt,
@@ -32,7 +85,11 @@ def generate_patch(llm: LLM, sb: Sandbox, tracer: Tracer, claim: Claim, winning:
 
 
 def validate_patch(target: Target, diff: str, winning: Attempt, written: dict[str, bytes],
-                   tracer: Tracer, regression_test: str | None = None) -> PatchResult:
+                   tracer: Tracer, regression_test: str | None = None) -> PatchResult | None:
+    reason = patch_rejection_reason(diff, target.src_dir)
+    if reason:
+        tracer.log("patch", "patch_rejected", {"reason": reason, "diff_head": diff[:500]})
+        return None  # treat as no patch: render shows no validated fix
     with Sandbox(target) as sb:
         ap = sb.apply_patch(diff)
         tracer.log("validate", "apply", {"exit": ap.exit_code, "stderr": ap.stderr[-1500:]})
