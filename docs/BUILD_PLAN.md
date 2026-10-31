@@ -69,6 +69,7 @@ secrets) · **GPT** = ChatGPT Pro (chat / deep research) · **Z** = you in Zed �
 | A7 | Prompt-injection drill on `demo/injection_curl_01` | A2 | CC | ✓ | not VERIFIED; trace shows the injection was ignored; no `environ` read |
 | A8 | Claim extraction on Baseten Muse Spark Open (`--claim-model cheap`): compare against Muse Spark on 10 reports | G3 | CX | ✓ | table: field accuracy + cost for both models, in HANDOFF.md |
 | A9 | Escalation: when Muse Spark ends NOT_REPRODUCED on a report whose cited code exists, retry once with `LLM.strong()` (Muse Wonder, `REPRO_STRONG_MODEL`) with a 10-step budget; log the escalation in the trace | G2 | CC | ✓ | ≥ 1 report that Spark missed is VERIFIED by Wonder; cost per escalation recorded in HANDOFF.md |
+| A10 ✅ | Tolerate unknown `code_ref` kinds: list the allowed kinds in `claim_extractor.md` + a `CodeRef.kind` before-validator mapping any unknown kind → `variable` | — | CC | – | kind `identifier` → `variable`, Claim validates, valid kinds unchanged (`tests/test_code_ref_kind.py`); the kind-enum ValidationError no longer occurs on `slop-curl-04` |
 
 ### Area B: oracle and verdict (deterministic, no LLM ever)
 *Files:* `repro/sanitizer.py`, `repro/match.py`, `repro/factcheck.py`, `tests/test_sanitizer_and_match.py`, `tests/fixtures/`
