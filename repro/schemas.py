@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def utcnow() -> datetime:
@@ -72,6 +72,18 @@ class CodeRef(BaseModel):
     file: Optional[str] = None
     line: Optional[int] = None
     quoted_code: Optional[str] = None             # code the report quotes verbatim, if any
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _coerce_unknown_kind(cls, v: Any) -> Any:
+        """A10: tolerate kinds outside the enum. The claim-extractor model sometimes labels an
+        identifier with a value we don't model (e.g. "identifier", "typedef", "enum", "field",
+        "symbol"). They are all identifier-like, so collapse any unknown string to "variable"
+        rather than fail the whole Claim. Known kinds and non-strings pass through untouched."""
+        allowed = ("function", "file", "line", "macro", "struct", "variable")
+        if isinstance(v, str) and v not in allowed:
+            return "variable"
+        return v
 
 
 class Claim(BaseModel):

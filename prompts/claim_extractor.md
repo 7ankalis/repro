@@ -16,6 +16,8 @@ Produce a JSON object matching the provided schema (Claim):
   report — do NOT correct or guess real names; spelling mistakes are evidence).
 - trigger_description: how the reporter says the bug is reached (inputs, options, API calls, sequence).
 - code_refs: EVERY concrete code identifier, file path, and file:line the report mentions, exactly as written.
+  Each ref's `kind` MUST be exactly one of: function, file, line, macro, struct, variable. Use "variable" for
+  any other identifier (typedef, enum, field, symbol, constant, parameter). Never invent a kind outside this list.
   If the report quotes code, put the quoted snippet in quoted_code of the matching ref (verbatim).
 - has_poc / poc_kind / poc_text: did the report include something runnable (a command line, input file contents,
   a C harness, a script)? Copy it verbatim into poc_text (truncate beyond ~8000 chars). Prose like "send a long header"

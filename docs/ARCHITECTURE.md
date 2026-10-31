@@ -61,6 +61,7 @@ files/                 every file the agent wrote (harnesses, PoC inputs)
 | Docker CLI via subprocess, not docker SDK | Fewer deps, same behavior on any machine. |
 | ARVO images | Prebuilt vul/fix pairs of real bugs → no build hell, free ground truth. |
 | Agent may not modify source during reproduction | Otherwise it could "create" the bug. Enforced by prompt + reviewed in trace. (Stretch: diff `/src` before/after.) |
+| `CodeRef.kind` before-validator maps unknown kinds → `variable` (A10) | The claim-extractor model sometimes emits a kind outside the enum (e.g. `identifier`); LLM-JSON retries can't fix it. Coercing identifier-like kinds keeps the whole Claim from failing validation. No field renamed/removed. |
 | Patch validated in a FRESH container | The agent can't fake validation by leaving state behind. |
 | Evidence trace is a first-class output | Maintainers (and judges) can audit every step. |
 

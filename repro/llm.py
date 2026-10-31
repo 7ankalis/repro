@@ -154,6 +154,8 @@ class LLM:
             self.tracer.log(stage, "llm_call", {
                 "model": self.model,
                 "latency_s": round(time.time() - t0, 2),
+                "finish_reason": getattr(resp.choices[0], "finish_reason", None),
+                "max_tokens": max_tokens,
                 "tokens_in": tin, "tokens_out": tout, "tokens_cached": cached,
                 "last_user_msg": _tail(messages),
                 "content": (msg.content or "")[:4000],
@@ -166,17 +168,36 @@ class LLM:
 
     # ------------------------------------------------------------------ structured output
     def structured(self, system: str, user: str, schema: Type[T], stage: str, temperature: float = 0.0) -> T:
-        """Ask for JSON matching `schema`. Uses json_schema response_format, falls back to parse+repair."""
+        """Ask for JSON matching `schema`. Uses json_schema response_format, falls back to parse+repair.
+
+        The claim/factcheck models reason inside `content`, so a small output cap truncates the JSON
+        mid-object and no amount of error-feedback repair recovers it (A11). Start from a generous cap
+        (REPRO_STRUCTURED_MAX_TOKENS, default 12000); if the model still stops on length or returns
+        empty/unparseable output, retry ONCE with the cap doubled before the error-feedback retries.
+        """
+        cap = _structured_max_tokens()
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         rf = {"type": "json_schema",
               "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema()}}
-        try:
-            resp = self.chat(messages, response_format=rf, temperature=temperature, stage=stage)
-        except Exception:
-            # Some endpoints reject json_schema: retry with instructions only.
-            messages[0]["content"] += "\n\nReturn ONLY a JSON object matching this JSON Schema:\n" + \
-                json.dumps(schema.model_json_schema())
-            resp = self.chat(messages, temperature=temperature, stage=stage)
+        schema_hint = "\n\nReturn ONLY a JSON object matching this JSON Schema:\n" + \
+            json.dumps(schema.model_json_schema())
+
+        def _ask(max_tokens: int):
+            try:
+                return self.chat(messages, response_format=rf, temperature=temperature,
+                                 max_tokens=max_tokens, stage=stage)
+            except Exception:
+                # Some endpoints reject json_schema: retry with instructions only.
+                if schema_hint not in messages[0]["content"]:
+                    messages[0]["content"] += schema_hint
+                return self.chat(messages, temperature=temperature, max_tokens=max_tokens, stage=stage)
+
+        resp = _ask(cap)
+        if _truncated(resp):
+            # Cut off while reasoning: nothing to correct, it just ran out of room. Give it more
+            # space once rather than feeding back an error, then fall through to the repair retries.
+            resp = _ask(cap * 2)
+
         text = strip_reasoning(resp.choices[0].message.content or "")
         for _ in range(2):
             try:
@@ -184,13 +205,35 @@ class LLM:
             except (ValidationError, ValueError) as e:
                 messages += [{"role": "assistant", "content": text},
                              {"role": "user", "content": f"Invalid JSON for schema: {e}. Return corrected JSON only."}]
-                text = strip_reasoning(self.chat(messages, temperature=0, stage=stage).choices[0].message.content or "")
+                text = strip_reasoning(
+                    self.chat(messages, temperature=0, max_tokens=cap, stage=stage).choices[0].message.content or "")
         return schema.model_validate_json(_extract_json(text))
 
 
 def _opt_float(var: str) -> Optional[float]:
     v = os.getenv(var)
     return float(v) if v not in (None, "") else None
+
+
+def _structured_max_tokens() -> int:
+    """Output cap for structured() calls. Default 12000; override with REPRO_STRUCTURED_MAX_TOKENS."""
+    v = os.getenv("REPRO_STRUCTURED_MAX_TOKENS")
+    try:
+        return int(v) if v not in (None, "") else 12000
+    except ValueError:
+        return 12000
+
+
+def _truncated(resp: Any) -> bool:
+    """True if the model stopped on length or produced empty/unparseable (likely cut-off) output."""
+    choice = resp.choices[0]
+    if getattr(choice, "finish_reason", None) == "length":
+        return True
+    try:
+        _extract_json(strip_reasoning(choice.message.content or ""))
+        return False
+    except ValueError:
+        return True
 
 
 _THINK = re.compile(r"<(think|thinking|reasoning)>.*?</\1>", re.S | re.I)
