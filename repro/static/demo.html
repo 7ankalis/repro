@@ -1,0 +1,165 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Repro demo</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+:root{--bg:#0b0e14;--panel:#11161f;--panel2:#161c27;--fg:#e8edf4;--mut:#8b96a5;--line:#252d3a;
+ --ok:#3fb950;--okbg:rgba(63,185,80,.16);--bad:#f85149;--badbg:rgba(248,81,73,.14);--warn:#d29922;--info:#58a6ff;
+ --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);
+ font:21px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh}
+header{display:flex;align-items:center;gap:22px;padding:14px 28px;border-bottom:1px solid var(--line);min-width:0}
+.brand{font-weight:800;font-size:26px;letter-spacing:.02em}.brand span{color:var(--ok)}
+#rid{color:var(--mut);font:18px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+#status{font:16px var(--mono);color:var(--mut);white-space:nowrap}
+.badge{font-weight:800;font-size:24px;padding:6px 16px;border-radius:10px;border:2px solid currentColor;white-space:nowrap}
+main{display:grid;grid-template-columns:minmax(0,31fr) minmax(0,41fr) minmax(0,28fr);gap:20px;padding:20px 28px 24px;min-height:0}
+section{min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column;background:var(--panel);
+ border:1px solid var(--line);border-radius:14px;padding:18px 22px}
+h2{font-size:14px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin:0 0 12px;flex:none}
+h3{font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:16px 0 8px}
+#report{flex:1;min-height:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 88%,transparent);mask-image:linear-gradient(#000 88%,transparent)}
+#report h1.title{font-size:27px;line-height:1.25;margin:0 0 14px}
+#report .md{font-size:20px}#report .md h1,#report .md h2,#report .md h3{font-size:22px;margin:14px 0 6px;letter-spacing:0;text-transform:none;color:var(--fg)}
+#report .md p{margin:0 0 12px}#report code{font:17px var(--mono);background:var(--panel2);padding:1px 5px;border-radius:5px}
+#report pre{font:16px/1.4 var(--mono);white-space:pre-wrap;word-break:break-word;background:var(--panel2);padding:10px 12px;border-radius:8px;margin:0 0 12px}
+.note{font-size:16px;color:var(--warn);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 0 12px}
+.att{font:15px var(--mono);color:var(--mut)}
+#evidence{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 16px;flex:none;animation:in .45s ease-out}
+.card h3{margin:0 0 8px}
+.claim{font-size:19px}.mut{color:var(--mut)}
+pre.code{font:16px/1.45 var(--mono);margin:0;white-space:pre-wrap;word-break:break-all;overflow:hidden}
+pre.code span{display:block;padding:0 6px;border-radius:4px}
+.l-error{color:var(--bad)}.l-summary{color:var(--warn);font-weight:700}.l-frame{color:#c9d1d9}
+.l-hit{background:var(--okbg);outline:2px solid var(--ok);color:#fff;font-weight:700}
+.l-add{color:var(--ok);background:rgba(63,185,80,.10)}.l-del{color:var(--bad);background:rgba(248,81,73,.10)}
+.l-hunk{color:var(--info)}.l-file{color:var(--mut)}
+.match{font-size:17px;margin-top:8px}
+table.checks{width:100%;border-collapse:collapse;font-size:17px}table.checks td{padding:4px 6px;border-top:1px solid var(--line);vertical-align:top}
+table.checks code{font:16px var(--mono)}
+.verdict{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.verdict .headline{font-size:19px;flex:1;min-width:0}
+.facts{display:flex;gap:18px;flex-wrap:wrap;font:16px var(--mono);color:var(--mut);margin-top:8px}
+.pill{font:15px var(--mono);padding:2px 10px;border-radius:999px;border:1px solid var(--line)}
+.pill.ok{color:var(--ok);border-color:var(--ok)}.pill.bad{color:var(--bad);border-color:var(--bad)}
+.waiting{color:var(--mut);font-size:18px;display:flex;align-items:center;gap:10px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--info);animation:pulse 1.2s infinite}
+#trace{flex:1;min-height:0;overflow:hidden}
+.ev{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:16px;line-height:1.35;animation:in .35s ease-out}
+.ev .n{font:14px var(--mono);color:var(--mut);text-align:right;padding-top:2px}
+.ev .stage{font:13px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.ev .sum{word-break:break-word;font-family:var(--mono);font-size:15px}
+.ev.s-sanitizer .stage,.ev.s-error .stage{color:var(--bad)}.ev.s-verdict .stage{color:var(--ok)}.ev.s-tool .stage{color:var(--info)}
+.ev.s-claim .stage,.ev.s-agent .stage{color:#d2a8ff}.ev.s-patch .stage,.ev.s-validate .stage{color:var(--warn)}
+.VERIFIED{color:var(--ok)}.INVALID_CLAIM{color:var(--bad)}.DIFFERENT_BUG{color:var(--warn)}
+.NOT_REPRODUCED,.OUT_OF_SCOPE{color:var(--info)}.ERROR{color:var(--mut)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.card,.ev,.dot{animation:none}}
+</style></head><body>
+<header><div class="brand">Re<span>pro</span></div><div id="rid">loading…</div><div id="status"></div><div id="badge"></div></header>
+<main>
+ <section aria-labelledby="h-report"><h2 id="h-report">Incoming report · untrusted</h2><div id="report"></div></section>
+ <section aria-labelledby="h-evidence"><h2 id="h-evidence">Machine evidence</h2><div id="evidence" aria-live="polite"></div></section>
+ <section aria-labelledby="h-trace"><h2 id="h-trace">Evidence trace · live</h2><div id="trace"></div></section>
+</main>
+<script>
+// Everything shown here comes from an attacker-controlled report or from model output: escape it all.
+// Markdown goes ONLY through DOMPurify; without DOMPurify/marked (offline) it is shown as escaped text.
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const md=s=>(window.DOMPurify&&window.marked)?DOMPurify.sanitize(marked.parse(String(s??''))):`<pre>${esc(s)}</pre>`;
+const $=id=>document.getElementById(id);
+const params=new URLSearchParams(location.search);
+const DELAY=Math.min(5,Math.max(0,parseFloat(params.get('delay')??'0.6')||0));
+const MAX_EVENTS=40;
+const S={run:null,data:null,events:[],shown:new Set(),done:false};
+
+async function getJSON(path){const r=await fetch(path);if(!r.ok)throw new Error(r.status===404?'Run not found.':'Unable to load the run.');return r.json();}
+
+function lines(ls){return `<pre class="code">${(ls||[]).map(l=>`<span class="l-${esc(l.kind)}">${esc(l.text)||' '}</span>`).join('')}</pre>`;}
+function waiting(t){return `<div class="waiting"><span class="dot"></span>${esc(t)}</div>`;}
+
+function renderReport(d){
+ const r=d.report||{}, notes={claim:'Report text was not saved with this run: showing the claim the model extracted from it.',
+  none:'Report text was not saved with this run.'};
+ $('report').innerHTML=`<h1 class="title">${esc(r.title)}</h1>${notes[r.source]?`<p class="note">${esc(notes[r.source])}</p>`:''}`+
+  `<div class="md">${md(r.body)}</div>`+((r.attachments||[]).length?`<p class="att">attachments: ${r.attachments.map(esc).join(', ')}</p>`:'');
+}
+
+function renderEvidence(){
+ const d=S.data, on=k=>S.shown.has(k), out=[];
+ if(!d){$('evidence').innerHTML=waiting('loading…');return;}
+ if(on('claim')&&d.claim) out.push(`<div class="card"><h3>Claim</h3><div class="claim">${esc(d.claim.summary)}</div>
+  <div class="facts"><span>${esc(d.claim.bug_class)}</span><span>${esc(d.claim.affected_function||'-')} · ${esc(d.claim.affected_file||'-')}</span></div></div>`);
+ if(on('checks')&&d.checks&&d.checks.length) out.push(`<div class="card"><h3>Fact-check of cited code</h3><table class="checks">${d.checks.map(c=>
+  `<tr><td class="${c.exists?'VERIFIED':'INVALID_CLAIM'}">${c.exists?'✓':'✗'}</td><td><code>${esc(c.name)}</code></td><td class="mut">${esc(c.evidence)}${c.nearest?` · closest: <code>${esc(c.nearest)}</code>`:''}</td></tr>`).join('')}</table></div>`);
+ if(on('crash')&&d.sanitizer) out.push(`<div class="card"><h3>Sanitizer output · attempt ${esc(d.sanitizer.attempt)}</h3>${
+  d.sanitizer.cmd?`<div class="facts" style="margin:0 0 8px">$ ${esc(d.sanitizer.cmd)}</div>`:''}${lines(d.sanitizer.lines)}${
+  d.match?`<div class="match"><span class="pill ${d.match.location_match?'ok':'bad'}">location ${d.match.location_match?'match':'no match'}</span> <span class="pill ${d.match.class_match?'ok':'bad'}">class ${d.match.class_match?'match':'no match'}</span> ${d.match.frame?`<span class="mut">matched frame</span> <b>${esc(d.match.frame)}</b>`:''}</div>`:''}</div>`);
+ if(on('verdict')&&d.verdict){const v=d.verdict; out.push(`<div class="card"><div class="verdict"><span class="badge ${esc(v.kind)}">${esc(v.kind)}</span>
+  <span class="headline">${esc(v.headline)}</span></div><div class="facts"><span>confidence ${Number(v.confidence||0).toFixed(2)}</span><span>${esc(v.attempts)} attempts</span>
+  <span>${Math.round(v.duration_s||0)}s</span><span>$${Number(v.cost_usd||0).toFixed(3)}</span>${v.fixed_confirmed===true?'<span class="VERIFIED">no crash on upstream fix</span>':''}</div>${
+  v.kind==='NOT_REPRODUCED'?'<p class="mut" style="margin:8px 0 0">Not reproduced ≠ not vulnerable.</p>':''}</div>`);}
+ if(on('fix')&&d.patch){const p=d.patch, t=p.tests_ok===null||p.tests_ok===undefined?'no tests':(p.tests_ok?'tests pass':'tests FAIL');
+  out.push(`<div class="card"><h3>Fix · ${p.validated?'<span class="VERIFIED">validated in a fresh container</span>':'<span class="INVALID_CLAIM">not validated</span>'}</h3>
+  <div class="facts" style="margin:0 0 8px"><span class="pill ${p.build_ok?'ok':'bad'}">builds</span><span class="pill ${p.poc_fixed?'ok':'bad'}">PoC fixed</span><span class="pill ${p.tests_ok===false?'bad':'ok'}">${esc(t)}</span></div>${lines(p.lines)}</div>`);}
+ if(!S.done) out.push(waiting(!S.events.length?'waiting for the first event…':on('verdict')?'finishing…':'reproducing…'));
+ $('evidence').innerHTML=out.join('');
+ const v=on('verdict')&&d.verdict; $('badge').innerHTML=v?`<span class="badge ${esc(v.kind)}">${esc(v.kind)}</span>`:'';
+}
+
+function renderTrace(){
+ const el=$('trace'), row=e=>`<div class="ev s-${esc(e.stage)}"><div class="n">${esc(e.step)}</div>`+
+  `<div><div class="stage">${esc(e.stage)} · ${esc(e.kind)}</div><div class="sum">${esc(e.summary)}</div></div></div>`;
+ // Newest at the bottom; drop the oldest rows until they fit (no scrollbar at 1080p).
+ let n=Math.min(MAX_EVENTS,S.events.length);
+ do{ el.innerHTML=S.events.slice(S.events.length-n).map(row).join(''); n--; }while(n>0&&el.scrollHeight>el.clientHeight);
+ $('status').textContent=`${S.events.length} events${S.done?' · done':' · live'}`;
+}
+
+function reveal(e){
+ const st=e.stage, art=e.artifact||'';
+ if(st==='claim'||art==='claim.json') S.shown.add('claim');
+ if(st==='factcheck'||e.kind==='fast_reject'||art==='factcheck.json'){S.shown.add('claim');S.shown.add('checks');}
+ if(st==='sanitizer'){S.shown.add('claim');S.shown.add('crash');}
+ if(st==='patch'||st==='validate'||art==='patch.json') S.shown.add('fix');
+ if(st==='verdict'||art==='verdict.json') ['claim','checks','crash','verdict'].forEach(k=>S.shown.add(k));
+}
+
+let refreshing=null;
+async function refresh(){ // live runs: pick up claim.json / factcheck.json / verdict.json as they are written
+ if(refreshing) return refreshing;
+ refreshing=getJSON('/api/demo/'+encodeURIComponent(S.run)).then(d=>{S.data=d;renderReport(d);renderEvidence();}).catch(()=>{}).finally(()=>{refreshing=null;});
+ return refreshing;
+}
+
+function onTrace(msg){
+ let e; try{e=JSON.parse(msg.data);}catch(_){return;}
+ S.events.push(e); reveal(e); renderTrace();
+ if(S.data&&S.data.live&&['claim','factcheck','sanitizer','patch','verdict'].includes(e.stage)) refresh(); else renderEvidence();
+}
+
+async function onDone(src){
+ if(src) src.close();
+ S.done=true;
+ if(!S.data||S.data.live) await refresh();
+ ['claim','checks','crash','verdict','fix'].forEach(k=>S.shown.add(k));
+ renderTrace(); renderEvidence();
+}
+
+async function start(){
+ const m=location.pathname.match(/^\/demo\/(.+)$/);
+ if(m) S.run=decodeURIComponent(m[1]);
+ else { const runs=await getJSON('/api/runs'); if(!runs.length) throw new Error('No triaged runs yet.'); S.run=runs[0].run_id; }
+ S.data=await getJSON('/api/demo/'+encodeURIComponent(S.run));
+ $('rid').textContent=S.data.report_id+(S.data.run_id!==S.data.report_id?'  ·  run '+S.data.run_id:'');
+ renderReport(S.data); renderEvidence(); renderTrace();
+ const src=new EventSource('/api/run/'+encodeURIComponent(S.run)+'/events?delay='+DELAY);
+ src.addEventListener('trace',onTrace);
+ src.addEventListener('done',()=>onDone(src));
+ src.onerror=()=>{ if(!S.done){ src.close(); onDone(null); } };
+}
+start().catch(err=>{$('evidence').innerHTML=`<p role="alert" class="INVALID_CLAIM">${esc(err.message)}</p><p><a style="color:var(--info)" href="/">← queue</a></p>`;});
+</script></body></html>
