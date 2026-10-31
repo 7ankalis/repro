@@ -81,3 +81,31 @@ def test_strip_reasoning_and_json_extraction():
     assert strip_reasoning("<think>{maybe} hmm</think>\npong") == "pong"
     assert strip_reasoning("half thought {x}</think> answer") == "answer"
     assert _extract_json('<think>try {"a": 0}</think>```json\n{"a": 1}\n```') == '{"a": 1}'
+
+
+def test_structured_retries_once_with_bigger_cap_on_length_truncation():
+    """A11: a finish_reason='length' response with truncated JSON triggers one retry with the cap
+    doubled (not an error-feedback retry), and the bigger-cap response parses successfully."""
+    from repro.llm import LLM
+    from repro.schemas import CodeRef
+
+    # First call: model reasons too long and gets cut off mid-object. Second call: fits.
+    responses = [
+        NS(choices=[NS(message=NS(content='<think>lots of reasoning...</think>{"kind": "function", "na',
+                                  tool_calls=None), finish_reason="length")]),
+        NS(choices=[NS(message=NS(content='{"kind": "function", "name": "split_to_dyn_array"}',
+                                  tool_calls=None), finish_reason="stop")]),
+    ]
+    caps: list[int] = []
+
+    def fake_chat(messages, response_format=None, temperature=0.0, max_tokens=4096, stage="agent", **kw):
+        caps.append(max_tokens)
+        return responses[len(caps) - 1]
+
+    llm = LLM(base_url="http://local", api_key="k", model="m")
+    llm.chat = fake_chat
+    out = llm.structured("sys", "user", CodeRef, stage="claim")
+
+    assert isinstance(out, CodeRef) and out.name == "split_to_dyn_array"
+    assert len(caps) == 2, "should retry exactly once on truncation"
+    assert caps[0] == 12000 and caps[1] == 24000, "retry must double the cap"
