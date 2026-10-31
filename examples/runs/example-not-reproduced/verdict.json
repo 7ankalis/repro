@@ -1,0 +1,107 @@
+{
+  "report_id": "example-not-reproduced",
+  "kind": "NOT_REPRODUCED",
+  "confidence": 0.5,
+  "headline": "Not reproduced after 4 sanitizer-instrumented attempts",
+  "claim": {
+    "summary": "Possible use-after-free in yaml_parser_fetch_more_tokens.",
+    "bug_class": "heap-use-after-free",
+    "affected_function": "yaml_parser_fetch_more_tokens",
+    "affected_file": null,
+    "trigger_description": "deeply nested flow sequences",
+    "code_refs": [],
+    "has_poc": false,
+    "poc_kind": null,
+    "poc_text": null,
+    "claimed_severity": null,
+    "extraction_notes": null
+  },
+  "factcheck": {
+    "checks": [
+      {
+        "ref": {
+          "kind": "function",
+          "name": "yaml_parser_fetch_more_tokens",
+          "file": null,
+          "line": null,
+          "quoted_code": null
+        },
+        "exists": true,
+        "evidence": "grep: found in 2 file(s)",
+        "nearest_match": null
+      }
+    ],
+    "hallucination_ratio": 0.0,
+    "quoted_code_found": null,
+    "slop_signals": []
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "strategy": "agent_input",
+      "description": "nested [[[ x 5000",
+      "exec": {
+        "cmd": "/out/libyaml_parser_fuzzer /work/in1",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "Executed in 3 ms",
+        "duration_s": 0.1,
+        "timed_out": false
+      },
+      "sanitizer": null
+    },
+    {
+      "n": 2,
+      "strategy": "agent_input",
+      "description": "nested {{{ x 5000",
+      "exec": {
+        "cmd": "/out/libyaml_parser_fuzzer /work/in2",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "Executed in 3 ms",
+        "duration_s": 0.1,
+        "timed_out": false
+      },
+      "sanitizer": null
+    },
+    {
+      "n": 3,
+      "strategy": "agent_input",
+      "description": "mixed flow + anchors",
+      "exec": {
+        "cmd": "/out/libyaml_parser_fuzzer /work/in3",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "Executed in 3 ms",
+        "duration_s": 0.1,
+        "timed_out": false
+      },
+      "sanitizer": null
+    },
+    {
+      "n": 4,
+      "strategy": "agent_input",
+      "description": "alias storm",
+      "exec": {
+        "cmd": "/out/libyaml_parser_fuzzer /work/in4",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "Executed in 3 ms",
+        "duration_s": 0.1,
+        "timed_out": false
+      },
+      "sanitizer": null
+    }
+  ],
+  "winning_attempt": null,
+  "match": null,
+  "patch": null,
+  "fixed_confirmed": null,
+  "maintainer_markdown": "## ➖ Repro: **NOT_REPRODUCED** · confidence 0.50\n_Not reproduced after 4 sanitizer-instrumented attempts_\n\n**Claim:** Possible use-after-free in yaml_parser_fetch_more_tokens.  \n**Class:** `heap-use-after-free` · **Location:** `yaml_parser_fetch_more_tokens` in `-` · **PoC supplied:** no\n\n### Fact-check of cited code\n| Reference | Exists | Evidence |\n|---|---|---|\n| `yaml_parser_fetch_more_tokens` (function) | ✅ | grep: found in 2 file(s) |\n\n> Not reproduced ≠ not vulnerable. All attempts are in the evidence trace; a maintainer can replay any of them.\n\n<details><summary>Attempts</summary>\n\n1. nested [[[ x 5000 → no crash\n2. nested {{{ x 5000 → no crash\n3. mixed flow + anchors → no crash\n4. alias storm → no crash\n\n</details>\n\n<sub>4 attempts · 340s · $0.031 · trace: `examples/runs/example-not-reproduced/trace.jsonl` · Repro never marks a report VERIFIED without sanitizer evidence.</sub>",
+  "cost_usd": 0.031,
+  "tokens_in": 39000,
+  "tokens_out": 2600,
+  "duration_s": 340.0,
+  "trace_path": "examples/runs/example-not-reproduced/trace.jsonl",
+  "created_at": "2026-10-31T10:46:11.763737Z"
+}

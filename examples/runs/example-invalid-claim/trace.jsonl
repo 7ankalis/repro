@@ -1,0 +1,3 @@
+{"ts":"2026-10-31T10:46:11.763193Z","run_id":"example-invalid-claim","step":1,"stage":"verdict","kind":"fast_reject","data":{"hallucination_ratio":1.0}}
+{"ts":"2026-10-31T10:46:11.763519Z","run_id":"example-invalid-claim","step":2,"stage":"note","kind":"artifact","data":{"name":"verdict.json","bytes":3681}}
+{"ts":"2026-10-31T10:46:11.763596Z","run_id":"example-invalid-claim","step":3,"stage":"note","kind":"artifact","data":{"name":"comment.md","bytes":990}}

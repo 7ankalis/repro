@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+*.api
+.baseten*
+.muse*
+*.key
+/runs/
+__pycache__/
+*.egg-info/
+.venv/
+datasets/**/cache/

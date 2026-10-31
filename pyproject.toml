@@ -1,0 +1,36 @@
+[project]
+name = "repro"
+version = "0.1.0"
+description = "Repro: machine-verified triage of vulnerability reports (sanitizer evidence, not vibes)"
+requires-python = ">=3.10"
+dependencies = [
+  "openai>=1.40",
+  "pydantic>=2.6",
+  "typer>=0.12",
+  "rich>=13",
+  "pyyaml>=6",
+  "python-dotenv>=1",
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+github = ["PyGithub>=2.3"]
+
+[project.scripts]
+repro = "repro.cli:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["repro"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+ignore = ["E501", "E731", "B008"]

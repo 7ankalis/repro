@@ -1,0 +1,2 @@
+{"ts":"2026-10-31T10:46:11.763879Z","run_id":"example-not-reproduced","step":1,"stage":"note","kind":"artifact","data":{"name":"verdict.json","bytes":3657}}
+{"ts":"2026-10-31T10:46:11.763957Z","run_id":"example-not-reproduced","step":2,"stage":"note","kind":"artifact","data":{"name":"comment.md","bytes":898}}

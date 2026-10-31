@@ -1,0 +1,99 @@
+{
+  "report_id": "example-invalid-claim",
+  "kind": "INVALID_CLAIM",
+  "confidence": 0.99,
+  "headline": "Claim references code that does not exist: `Curl_parse_header_secure`, `lib/http_secure.c`, `CURL_MAX_SECURE_HDR`",
+  "claim": {
+    "summary": "Claimed heap overflow in Curl_parse_header_secure for headers over 8 KB.",
+    "bug_class": "heap-buffer-overflow",
+    "affected_function": "Curl_parse_header_secure",
+    "affected_file": "lib/http_secure.c",
+    "trigger_description": "response header > 8192 bytes",
+    "code_refs": [
+      {
+        "kind": "function",
+        "name": "Curl_parse_header_secure",
+        "file": null,
+        "line": null,
+        "quoted_code": null
+      },
+      {
+        "kind": "file",
+        "name": "lib/http_secure.c",
+        "file": null,
+        "line": null,
+        "quoted_code": null
+      },
+      {
+        "kind": "macro",
+        "name": "CURL_MAX_SECURE_HDR",
+        "file": null,
+        "line": null,
+        "quoted_code": null
+      }
+    ],
+    "has_poc": false,
+    "poc_kind": null,
+    "poc_text": null,
+    "claimed_severity": null,
+    "extraction_notes": null
+  },
+  "factcheck": {
+    "checks": [
+      {
+        "ref": {
+          "kind": "function",
+          "name": "Curl_parse_header_secure",
+          "file": null,
+          "line": null,
+          "quoted_code": null
+        },
+        "exists": false,
+        "evidence": "grep: 0 files contain 'Curl_parse_header_secure'",
+        "nearest_match": "Curl_http_header"
+      },
+      {
+        "ref": {
+          "kind": "file",
+          "name": "lib/http_secure.c",
+          "file": null,
+          "line": null,
+          "quoted_code": null
+        },
+        "exists": false,
+        "evidence": "find: 0 match(es) for 'lib/http_secure.c'",
+        "nearest_match": null
+      },
+      {
+        "ref": {
+          "kind": "macro",
+          "name": "CURL_MAX_SECURE_HDR",
+          "file": null,
+          "line": null,
+          "quoted_code": null
+        },
+        "exists": false,
+        "evidence": "grep: 0 files contain 'CURL_MAX_SECURE_HDR'",
+        "nearest_match": "CURL_MAX_HTTP_HEADER"
+      }
+    ],
+    "hallucination_ratio": 1.0,
+    "quoted_code_found": null,
+    "slop_signals": [
+      "Cited function does not exist",
+      "Report contains no proof of concept."
+    ]
+  },
+  "attempts": [],
+  "winning_attempt": null,
+  "match": null,
+  "patch": null,
+  "fixed_confirmed": null,
+  "maintainer_markdown": "## ❌ Repro: **INVALID_CLAIM** · confidence 0.99\n_Claim references code that does not exist: `Curl_parse_header_secure`, `lib/http_secure.c`, `CURL_MAX_SECURE_HDR`_\n\n**Claim:** Claimed heap overflow in Curl_parse_header_secure for headers over 8 KB.  \n**Class:** `heap-buffer-overflow` · **Location:** `Curl_parse_header_secure` in `lib/http_secure.c` · **PoC supplied:** no\n\n### Fact-check of cited code\n| Reference | Exists | Evidence |\n|---|---|---|\n| `Curl_parse_header_secure` (function) | ❌ | grep: 0 files contain 'Curl_parse_header_secure' — closest: `Curl_http_header` |\n| `lib/http_secure.c` (file) | ❌ | find: 0 match(es) for 'lib/http_secure.c' |\n| `CURL_MAX_SECURE_HDR` (macro) | ❌ | grep: 0 files contain 'CURL_MAX_SECURE_HDR' — closest: `CURL_MAX_HTTP_HEADER` |\n\n\n<details><summary>Attempts</summary>\n\n\n</details>\n\n<sub>0 attempts · 31s · $0.004 · trace: `examples/runs/example-invalid-claim/trace.jsonl` · Repro never marks a report VERIFIED without sanitizer evidence.</sub>",
+  "cost_usd": 0.004,
+  "tokens_in": 2900,
+  "tokens_out": 420,
+  "duration_s": 31.0,
+  "trace_path": "examples/runs/example-invalid-claim/trace.jsonl",
+  "created_at": "2026-10-31T10:46:11.763294Z"
+}

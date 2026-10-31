@@ -1,0 +1,22 @@
+# Targets Repro can triage against. Each report's front matter can also embed its own target block.
+# ARVO image tags: n132/arvo:<ARVO_ID>-vul  (vulnerable)  /  n132/arvo:<ARVO_ID>-fix (patched)
+# Inside ARVO images: `arvo` replays the ground-truth PoC (DENIED to the agent), `arvo compile` rebuilds.
+
+curl:
+  project: curl
+  image: repro/curl-asan:latest          # built from docker/curl-asan.Dockerfile (`make curl-image`)
+  src_dir: /src/curl
+  build_cmd: "make -j$(nproc) >/dev/null && echo BUILD_OK"
+  repro_cmd: null
+  test_cmd: "make -C tests test TFLAGS='1 to 60' >/tmp/tests.log 2>&1; tail -5 /tmp/tests.log; grep -q 'TESTFAIL' /tmp/tests.log && exit 1 || exit 0"   # VERIFY syntax day 1
+
+# Fill these from ARVO-Meta (task C1). Prefer small C libraries with fast builds:
+# libxml2, libyaml, libpng, libjpeg-turbo, lcms, libexif, mruby, binutils (avoid ffmpeg / big C++ monsters)
+arvo_example:
+  project: libxml2
+  image: n132/arvo:REPLACE_ID-vul
+  fixed_image: n132/arvo:REPLACE_ID-fix
+  src_dir: /src/libxml2
+  build_cmd: "arvo compile"
+  repro_cmd: "arvo"
+  test_cmd: null

@@ -1,0 +1,96 @@
+{
+  "report_id": "example-verified",
+  "kind": "VERIFIED",
+  "confidence": 1.0,
+  "headline": "Reproduced: heap-buffer-overflow in `xmlParseCharRef` (/src/libxml2/parser.c:2104)",
+  "claim": {
+    "summary": "Heap over-read in xmlParseCharRef when parsing a truncated character reference.",
+    "bug_class": "heap-buffer-overflow",
+    "affected_function": "xmlParseCharRef",
+    "affected_file": "parser.c",
+    "trigger_description": "truncated &#x reference at end of input",
+    "code_refs": [],
+    "has_poc": true,
+    "poc_kind": "input_file",
+    "poc_text": null,
+    "claimed_severity": null,
+    "extraction_notes": null
+  },
+  "factcheck": null,
+  "attempts": [
+    {
+      "n": 1,
+      "strategy": "reporter_poc",
+      "description": "reporter PoC on xml fuzz target",
+      "exec": {
+        "cmd": "/out/xml /work/report/poc.bin",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "==18==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x602000000031 at pc 0x55d1 bp 0x7ffc sp 0x7ffc\nREAD of size 1 at 0x602000000031 thread T0\n    #0 0x55d1e3c2a in xmlParseCharRef /src/libxml2/parser.c:2104:13\n    #1 0x55d1e3b00 in xmlParseReference /src/libxml2/parser.c:7012:9\n    #2 0x55d1e3a10 in LLVMFuzzerTestOneInput /src/libxml2/fuzz/xml.c:44:5\n\nSUMMARY: AddressSanitizer: heap-buffer-overflow /src/libxml2/parser.c:2104:13 in xmlParseCharRef\n",
+        "duration_s": 0.4,
+        "timed_out": false
+      },
+      "sanitizer": {
+        "tool": "asan",
+        "error_type": "heap-buffer-overflow",
+        "access": "READ",
+        "access_size": 1,
+        "summary_line": "SUMMARY: AddressSanitizer: heap-buffer-overflow /src/libxml2/parser.c:2104:13 in xmlParseCharRef",
+        "frames": [
+          {
+            "index": 0,
+            "function": "xmlParseCharRef",
+            "file": "/src/libxml2/parser.c",
+            "line": 2104,
+            "module": null
+          },
+          {
+            "index": 1,
+            "function": "xmlParseReference",
+            "file": "/src/libxml2/parser.c",
+            "line": 7012,
+            "module": null
+          },
+          {
+            "index": 2,
+            "function": "LLVMFuzzerTestOneInput",
+            "file": "/src/libxml2/fuzz/xml.c",
+            "line": 44,
+            "module": null
+          }
+        ],
+        "raw": "==18==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x602000000031 at pc 0x55d1 bp 0x7ffc sp 0x7ffc\nREAD of size 1 at 0x602000000031 thread T0\n    #0 0x55d1e3c2a in xmlParseCharRef /src/libxml2/parser.c:2104:13\n    #1 0x55d1e3b00 in xmlParseReference /src/libxml2/parser.c:7012:9\n    #2 0x55d1e3a10 in LLVMFuzzerTestOneInput /src/libxml2/fuzz/xml.c:44:5\n\nSUMMARY: AddressSanitizer: heap-buffer-overflow /src/libxml2/parser.c:2104:13 in xmlParseCharRef"
+      }
+    }
+  ],
+  "winning_attempt": 1,
+  "match": {
+    "class_match": true,
+    "location_match": true,
+    "matched_frame": {
+      "index": 0,
+      "function": "xmlParseCharRef",
+      "file": "/src/libxml2/parser.c",
+      "line": 2104,
+      "module": null
+    },
+    "score": 1.0,
+    "explanation": "observed heap-buffer-overflow (heap-buffer-overflow); claimed heap-buffer-overflow; class exact; location matched frame #0 xmlParseCharRef /src/libxml2/parser.c:2104"
+  },
+  "patch": {
+    "diff": "--- a/parser.c\n+++ b/parser.c\n@@ -2101,6 +2101,8 @@ xmlParseCharRef(xmlParserCtxtPtr ctxt) {\n     while (RAW != ';') {\n+        if (ctxt->input->cur >= ctxt->input->end)\n+            goto done;\n         if (val > 0x110000)\n",
+    "regression_test": "/out/xml /work/report/poc.bin",
+    "poc_still_crashes": false,
+    "build_ok": true,
+    "tests_ok": true,
+    "notes": "validated in fresh container (synthetic example)"
+  },
+  "fixed_confirmed": true,
+  "maintainer_markdown": "## ✅ Repro: **VERIFIED** · confidence 1.00\n_Reproduced: heap-buffer-overflow in `xmlParseCharRef` (/src/libxml2/parser.c:2104)_\n\n**Claim:** Heap over-read in xmlParseCharRef when parsing a truncated character reference.  \n**Class:** `heap-buffer-overflow` · **Location:** `xmlParseCharRef` in `parser.c` · **PoC supplied:** yes\n\n### Sanitizer evidence\nCommand: `/out/xml /work/report/poc.bin`\n```\n==18==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x602000000031 at pc 0x55d1 bp 0x7ffc sp 0x7ffc\nREAD of size 1 at 0x602000000031 thread T0\n    #0 0x55d1e3c2a in xmlParseCharRef /src/libxml2/parser.c:2104:13\n    #1 0x55d1e3b00 in xmlParseReference /src/libxml2/parser.c:7012:9\n    #2 0x55d1e3a10 in LLVMFuzzerTestOneInput /src/libxml2/fuzz/xml.c:44:5\n\nSUMMARY: AddressSanitizer: heap-buffer-overflow /src/libxml2/parser.c:2104:13 in xmlParseCharRef\n```\n**Match:** observed heap-buffer-overflow (heap-buffer-overflow); claimed heap-buffer-overflow; class exact; location matched frame #0 xmlParseCharRef /src/libxml2/parser.c:2104 (score 1.0)\n\n### Proposed fix (✅ validated)\n- Builds: yes · PoC fixed: yes · Tests: pass\n```diff\n--- a/parser.c\n+++ b/parser.c\n@@ -2101,6 +2101,8 @@ xmlParseCharRef(xmlParserCtxtPtr ctxt) {\n     while (RAW != ';') {\n+        if (ctxt->input->cur >= ctxt->input->end)\n+            goto done;\n         if (val > 0x110000)\n\n```\n\n<details><summary>Attempts</summary>\n\n1. reporter PoC on xml fuzz target → **heap-buffer-overflow**\n\n</details>\n\n<sub>1 attempts · 212s · $0.042 · trace: `examples/runs/example-verified/trace.jsonl` · Repro never marks a report VERIFIED without sanitizer evidence.</sub>",
+  "cost_usd": 0.042,
+  "tokens_in": 48000,
+  "tokens_out": 3100,
+  "duration_s": 212.0,
+  "trace_path": "examples/runs/example-verified/trace.jsonl",
+  "created_at": "2026-10-31T10:46:11.760590Z"
+}
