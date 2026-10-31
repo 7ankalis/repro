@@ -25,8 +25,17 @@ class FactChecker:
         self.sb = sb
         self.src = sb.target.src_dir
         self._idents: Optional[list[str]] = None
+        self._out_names: Optional[set[str]] = None
 
     # ------------------------------------------------------------------ helpers
+    def _out_executables(self) -> set[str]:
+        """Discover runtime binary names once; they are not source references."""
+        if self._out_names is None:
+            result = self.sb.exec("find /out -maxdepth 1 -type f -executable -print0", timeout=30, workdir="/")
+            self._out_names = {PurePosixPath(p).name for p in result.stdout.split("\0")
+                               if p and PurePosixPath(p).parent == PurePosixPath("/out")}
+        return self._out_names
+
     def _identifiers(self) -> list[str]:
         """All function-like identifiers in the tree (for 'did you mean')."""
         if self._idents is None:
@@ -131,11 +140,18 @@ class FactChecker:
 
     def run(self, claim: Claim, attachments: Iterable[str] = ()) -> FactCheckResult:
         """Check source refs only; callers supply report attachment names, never contents."""
-        refs = list(claim.code_refs)
+        refs = []
+        for ref in claim.code_refs:
+            # Extractors may label a function as variable (including coerced unknown kinds).
+            if ref.name == claim.affected_function and ref.kind in ("function", "variable", "macro", "struct"):
+                ref = ref.model_copy(update={"kind": "function"})
+            elif ref.name == claim.affected_file and ref.kind != "line":
+                ref = ref.model_copy(update={"kind": "file"})
+            refs.append(ref)
         # Always check the claimed function/file even if the extractor forgot to list them.
-        if claim.affected_function and not any(r.name == claim.affected_function for r in refs):
+        if claim.affected_function and not any(r.kind == "function" and r.name == claim.affected_function for r in refs):
             refs.append(CodeRef(kind="function", name=claim.affected_function))
-        if claim.affected_file and not any(r.name == claim.affected_file for r in refs):
+        if claim.affected_file and not any(r.kind == "file" and r.name == claim.affected_file for r in refs):
             refs.append(CodeRef(kind="file", name=claim.affected_file))
 
         attachment_names = set(attachments)
@@ -147,6 +163,8 @@ class FactChecker:
             if any(p and (PurePosixPath(p).parts[:2] in (("/", "out"), ("/", "work"))
                           or p in attachment_names) for p in paths):
                 continue
+            if _IDENT.fullmatch(ref.name) and ref.name in self._out_executables():
+                continue
             if ref.kind == "line":
                 file = ref.file or claim.affected_file
                 if not file:
@@ -157,11 +175,19 @@ class FactChecker:
                 if PurePosixPath(file).parts[:2] in (("/", "out"), ("/", "work")) or file in attachment_names:
                     continue
             source_refs.append(ref)
-        checks = [self.check_ref(r) for r in source_refs]
+        # Retain every distinct quoted block even when its display row is a duplicate.
+        quoted_blocks = list(dict.fromkeys(r.quoted_code for r in source_refs if r.quoted_code))
+        unique_refs = {}
+        for ref in source_refs:
+            key = ((ref.kind, str(PurePosixPath(ref.name))) if ref.kind == "file"
+                   else (ref.kind, ref.name, ref.file, ref.line))
+            unique_refs.setdefault(key, ref)
+        checks = [self.check_ref(r) for r in unique_refs.values()]
         # Use the filtered source checks so attachments and runtime paths cannot form a pair.
         function_exists = any(c.exists and c.ref.kind == "function" and c.ref.name == claim.affected_function
                               for c in checks)
-        file_exists = any(c.exists and c.ref.kind == "file" and c.ref.name == claim.affected_file
+        file_exists = any(c.exists and c.ref.kind == "file"
+                          and PurePosixPath(c.ref.name) == PurePosixPath(claim.affected_file or "")
                           for c in checks)
         if function_exists and file_exists:
             pair = self._check_pair(claim.affected_function, claim.affected_file)
@@ -171,7 +197,6 @@ class FactChecker:
         ratio = len(missing) / len(checks) if checks else 0.0
 
         quoted_ok: Optional[bool] = None
-        quoted_blocks = [r.quoted_code for r in source_refs if r.quoted_code]
         if quoted_blocks:
             quoted_ok = all(self.check_quoted_code(q) for q in quoted_blocks)
 
