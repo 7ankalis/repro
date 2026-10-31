@@ -50,3 +50,14 @@
   double-free" → `double-free`).
 - `build_real_dataset.py` no longer calls a model (its old C1 `write_report` stub had no output checks and a stale
   prompt contract); `--validate-only` is kept as a no-op flag.
+
+## [B5] trigger fidelity in `match.decide` — note for area A
+- Who: B5 (`repro/match.py`, tests). Found in the C6 eval: slop-curl-real-2819666 came out VERIFIED because an
+  agent-written `%s%n` harness crashed inside `curl_mfprintf`, while the report's own `%x %x %x %x` PoC did not.
+- `decide(claim, fc, attempts, sources=None)` has a new optional `sources` arg (= `ToolExecutor.written`). A crash
+  counts toward VERIFIED only if the attempt's trigger is faithful: when the claim cites printf format specifiers,
+  the attempt's string literals (its command + written sources it references) must not add conversions the claim
+  never cited. A divergent crash at the claimed spot is DIFFERENT_BUG (conf 0.7 if the fact-check failed, else 0.5).
+  `reporter_poc`/`known_reproducer` attempts are always faithful.
+- (B5 → area A, applied with the task owner's sign-off) `pipeline.py`: passes `tools.written` to `decide`, and
+  `verified_already` (agent early stop) also requires `match.is_faithful`.

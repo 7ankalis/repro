@@ -4,6 +4,8 @@ Deterministic verdict logic. NO LLM CALLS IN THIS FILE.
 Principle: "the LLM proposes, the sanitizer decides".
   * A crash always beats a fact-check (a real crash is real even if the report hallucinated names).
   * VERIFIED requires: sanitizer crash + claimed location in the top project frames + compatible bug class.
+  * VERIFIED also requires trigger fidelity: the winning attempt must exercise the trigger the report
+    describes, not a materially different input the agent invented (B5: a %s%n harness "verifying" a %x claim).
   * INVALID_CLAIM requires: no crash + the claim's key code references do not exist.
 """
 from __future__ import annotations
@@ -37,6 +39,13 @@ COMPATIBLE: dict[BugClass, set[BugClass]] = {
 
 VERIFY_THRESHOLD = 0.75
 TOP_FRAMES = 6
+
+# printf-style conversion: flags, width, precision, length, conversion char. "%%" is consumed separately.
+# No space flag: prose like "100% sure" must not read as "% s".
+_FMT_SPEC = re.compile(r"%%|%[-+#0]*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|L|q|j|z|t)?([diouxXeEfFgGaAcspn])")
+_STR_LIT = re.compile(r'"((?:[^"\\\n]|\\.)*)"|\'((?:[^\'\\\n]|\\.)*)\'')
+# Attempts that replay the reporter's own input are faithful by construction.
+_FAITHFUL_STRATEGIES = {"reporter_poc", "known_reproducer"}
 
 
 def _norm_fn(name: Optional[str]) -> str:
@@ -85,19 +94,85 @@ def match_claim(claim: Claim, rep: SanitizerReport) -> MatchDetail:
                        matched_frame=matched, score=score, explanation=why)
 
 
+def _specifiers(text: str) -> set[str]:
+    """Conversion chars of printf-style format specifiers in text ({'x'} for "%x %x")."""
+    return {m.group(1) for m in _FMT_SPEC.finditer(text or "") if m.group(1)}
+
+
+def _literals(text: str) -> str:
+    return "\n".join(a or b for a, b in _STR_LIT.findall(text or ""))
+
+
+def attempt_text(attempt: Attempt, sources: Optional[dict[str, bytes | str]] = None) -> str:
+    """The attempt's command plus the source of any written file it references (by name or stem)."""
+    cmd = attempt.exec.cmd if attempt.exec else attempt.description
+    parts = [cmd]
+    for path, data in (sources or {}).items():
+        name = os.path.basename(path)
+        stem = os.path.splitext(name)[0]
+        if not name or not re.search(rf"(?<![\w.-])(?:{re.escape(name)}|{re.escape(stem)})(?![\w-])", cmd):
+            continue
+        parts.append(data.decode("utf-8", "replace") if isinstance(data, bytes) else data)
+    return "\n".join(parts)
+
+
+def trigger_divergence(claim: Claim, attempt: Attempt,
+                       sources: Optional[dict[str, bytes | str]] = None) -> Optional[str]:
+    """Return why the attempt's trigger is NOT the claimed one, or None if faithful / not checkable.
+
+    Concrete rule (deliberately narrow): when the claim cites printf-style format specifiers (in poc_text or
+    trigger_description), the string literals of the attempt (its command + the sources it runs) must not
+    introduce conversions the claim never mentioned. Claim "%x %x %x %x" vs harness "%s%n" -> divergent.
+    """
+    if attempt.strategy in _FAITHFUL_STRATEGIES:
+        return None
+    claimed = _specifiers(f"{claim.poc_text or ''}\n{claim.trigger_description or ''}")
+    if not claimed:
+        return None
+    new = _specifiers(_literals(attempt_text(attempt, sources))) - claimed
+    if not new:
+        return None
+
+    def fmt(xs: set[str]) -> str:
+        return " ".join(f"%{c}" for c in sorted(xs))
+    return (f"trigger diverges from the claim: attempt #{attempt.n} uses format specifiers {fmt(new)} "
+            f"never cited by the report (claimed {fmt(claimed)})")
+
+
+def is_faithful(claim: Claim, attempt: Attempt, sources: Optional[dict[str, bytes | str]] = None) -> bool:
+    return trigger_divergence(claim, attempt, sources) is None
+
+
+def _claim_discredited(fc: Optional[FactCheckResult]) -> bool:
+    return bool(fc and (fc.hallucination_ratio >= 0.5 or fc.quoted_code_found is False))
+
+
 def decide(
     claim: Claim,
     factcheck: Optional[FactCheckResult],
     attempts: list[Attempt],
+    sources: Optional[dict[str, bytes | str]] = None,
 ) -> tuple[VerdictKind, float, Optional[int], Optional[MatchDetail]]:
-    """Return (kind, confidence, winning_attempt_n, match)."""
+    """Return (kind, confidence, winning_attempt_n, match).
+
+    `sources` maps sandbox paths to files the agent wrote (ToolExecutor.written), so the trigger-fidelity
+    check can read the harness a crashing command compiled/ran.
+    """
     crashes = [a for a in attempts if a.sanitizer is not None]
     if crashes:
-        best = max(((a, match_claim(claim, a.sanitizer)) for a in crashes), key=lambda t: t[1].score)
-        a, m = best
-        if m.class_match and m.location_match:
-            # Below VERIFY_THRESHOLD we still say VERIFIED, but the confidence shows it (UI: "weak match").
-            return VerdictKind.VERIFIED, m.score, a.n, m
+        scored = [(a, match_claim(claim, a.sanitizer), trigger_divergence(claim, a, sources)) for a in crashes]
+        faithful = [t for t in scored if t[2] is None]
+        if faithful:
+            a, m, _ = max(faithful, key=lambda t: t[1].score)
+            if m.class_match and m.location_match:
+                # Below VERIFY_THRESHOLD we still say VERIFIED, but the confidence shows it (UI: "weak match").
+                return VerdictKind.VERIFIED, m.score, a.n, m
+        a, m, div = max(scored, key=lambda t: t[1].score)
+        if div and m.class_match and m.location_match:
+            # A real crash at the claimed spot, but from an input the report never described: the claim as
+            # written is not what crashed, so never VERIFIED. More confident when the fact-check also failed.
+            conf = 0.7 if _claim_discredited(factcheck) else 0.5
+            return VerdictKind.DIFFERENT_BUG, conf, a.n, m.model_copy(update={"explanation": f"{m.explanation}; {div}"})
         return VerdictKind.DIFFERENT_BUG, max(0.5, m.score), a.n, m
 
     if claim.bug_class == BugClass.non_memory:
