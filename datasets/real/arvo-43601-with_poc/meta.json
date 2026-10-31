@@ -1,0 +1,33 @@
+{
+  "id": "43601",
+  "project": "lcms",
+  "image": "n132/arvo:43601-vul",
+  "fixed_image": "n132/arvo:43601-fix",
+  "command": "/out/cms_overwrite_transform_fuzzer /work/c1-poc",
+  "poc_source": "/tmp/poc",
+  "poc_sha256": "9b3e94d2ef5095a8cc3749f84275c9f5df0ec3af7fd26e832e8102e554aab209",
+  "poc_bytes": 288,
+  "function": "cmsReadTag",
+  "file": "/src/lcms/src/cmsio0.c",
+  "bug_type": "array-index-out-of-bounds",
+  "fuzz_target": "/out/cms_overwrite_transform_fuzzer",
+  "vulnerable": {
+    "cmd": "/out/cms_overwrite_transform_fuzzer /work/c1-poc",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "INFO: Running with entropic power schedule (0xFF, 100).\nINFO: Seed: 2662502856\nINFO: Loaded 1 modules   (10591 inline 8-bit counters): 10591 [0x5d7900, 0x5da25f), \nINFO: Loaded 1 PC tables (10591 PCs): 10591 [0x554a50,0x57e040), \n/out/cms_overwrite_transform_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\ncmsio0.c:1622:9: runtime error: index -1 out of bounds for type 'void *[100]'\n    #0 0x4b7b65 in cmsReadTag /src/lcms/src/cmsio0.c:1622:9\n    #1 0x50b9b1 in ReadICCMatrixRGB2XYZ /src/lcms/src/cmsio1.c:139:30\n    #2 0x50a156 in BuildRGBOutputMatrixShaper /src/lcms/src/cmsio1.c:463:10\n    #3 0x50a156 in _cmsReadOutputLUT /src/lcms/src/cmsio1.c:659:12\n    #4 0x4f1de7 in DefaultICCintents /src/lcms/src/cmscnvrt.c:605:23\n    #5 0x4f2484 in _cmsLinkProfiles /src/lcms/src/cmscnvrt.c:1137:12\n    #6 0x4ce69e in cmsCreateExtendedTransform /src/lcms/src/cmsxform.c:1094:11\n    #7 0x4cf76e in cmsCreateMultiprofileTransformTHR /src/lcms/src/cmsxform.c:1210:12\n    #8 0x4cf941 in cmsCreateTransformTHR /src/lcms/src/cmsxform.c:1251:12\n    #9 0x4cf941 in cmsCreateTransform /src/lcms/src/cmsxform.c:1261:12\n    #10 0x4b3605 in LLVMFuzzerTestOneInput /src/cms_overwrite_transform_fuzzer.c:30:15\n    #11 0x43d7a3 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) cxa_noexception.cpp\n    #12 0x4293f2 in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:324:6\n    #13 0x42ec3c in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) cxa_noexception.cpp\n    #14 0x457a02 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10\n    #15 0x710227f64082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082)\n    #16 0x407b6d in _start (/out/cms_overwrite_transform_fuzzer+0x407b6d)\n\nSUMMARY: UndefinedBehaviorSanitizer: undefined-behavior cmsio0.c:1622:9 in \n",
+    "duration_s": 0.08,
+    "timed_out": false
+  },
+  "fixed": {
+    "cmd": "/out/cms_overwrite_transform_fuzzer /work/c1-poc",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "INFO: Running with entropic power schedule (0xFF, 100).\nINFO: Seed: 2662811268\nINFO: Loaded 1 modules   (10632 inline 8-bit counters): 10632 [0x5d7a40, 0x5da3c8), \nINFO: Loaded 1 PC tables (10632 PCs): 10632 [0x554a50,0x57e2d0), \n/out/cms_overwrite_transform_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\nExecuted /work/c1-poc in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n",
+    "duration_s": 0.06,
+    "timed_out": false
+  },
+  "checked_at": "2026-10-31T16:44:01.574203+00:00",
+  "mode": "with_poc",
+  "directory": "arvo-43601-with_poc"
+}

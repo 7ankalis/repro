@@ -1,0 +1,61 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 520220149
+INFO: Loaded 1 modules   (7149 inline 8-bit counters): 7149 [0x6bfd00, 0x6c18ed), 
+INFO: Loaded 1 PC tables (7149 PCs): 7149 [0x658d40,0x674c10), 
+/out/pcre2_fuzzer: Running 1 inputs 1 time(s) each.
+Running: /work/c1-poc
+=================================================================
+==35==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7fff7c45d5d0 at pc 0x00000049fec1 bp 0x7fff7c45a8d0 sp 0x7fff7c45a0a0
+READ of size 496 at 0x7fff7c45d5d0 thread T0
+    #0 0x49fec0 in __asan_memcpy /src/llvm-project/compiler-rt/lib/asan/asan_interceptors_memintrinsics.cpp:22:3
+    #1 0x5dea62 in match /src/pcre2/src/pcre2_match.c:819:5
+    #2 0x59ae16 in pcre2_match_8 /src/pcre2/src/pcre2_match.c:6583:8
+    #3 0x56c714 in LLVMFuzzerTestOneInput /src/pcre2/src/pcre2_fuzzsupport.c:193:19
+    #4 0x4fc583 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:611:15
+    #5 0x4e7ce2 in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:324:6
+    #6 0x4ed58c in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:860:9
+    #7 0x516ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #8 0x746ac53b5082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 87b331c034a6458c64ce09c03939e947212e18ce)
+    #9 0x41f6fd in _start (/out/pcre2_fuzzer+0x41f6fd)
+
+Address 0x7fff7c45d5d0 is located in stack of thread T0 at offset 10608 in frame
+    #0 0x598d0f in pcre2_match_8 /src/pcre2/src/pcre2_match.c:5992
+
+  This frame has 2 object(s):
+    [32, 296) 'actual_match_block' (line 6022)
+    [368, 10608) 'stack_frames_vector' (line 6030) <== Memory access at offset 10608 overflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow /src/llvm-project/compiler-rt/lib/asan/asan_interceptors_memintrinsics.cpp:22:3 in __asan_memcpy
+Shadow bytes around the buggy address:
+  0x10006f883a60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x10006f883a70: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x10006f883a80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x10006f883a90: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x10006f883aa0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x10006f883ab0: 00 00 00 00 00 00 00 00 00 00[f3]f3 f3 f3 f3 f3
+  0x10006f883ac0: f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3
+  0x10006f883ad0: f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 00 00 00 00
+  0x10006f883ae0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x10006f883af0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x10006f883b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==35==ABORTING

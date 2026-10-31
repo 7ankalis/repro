@@ -21,8 +21,10 @@ import hashlib
 import json
 import re
 import shlex
+import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +39,13 @@ from repro.schemas import Target
 from repro.trace import Tracer
 
 MODES = ("with_poc", "text_only")
+# Giant source trees whose ARVO images build/run far too slowly for the eval set. The ARVO-Meta
+# "project" label is unreliable (some ids labelled as a small lib crash inside a bundled llvm),
+# so this is checked against the *validated* crash's project, not the shortlist label.
+GIANT_PROJECTS = frozenset({
+    "llvm-project", "llvm", "skia", "chromium", "chrome", "v8", "pdfium", "firefox",
+    "mozilla", "gecko-dev", "webkit", "tensorflow", "node", "nodejs", "android", "swift",
+})
 # Eval-only artifacts written beside each report. io.load_report never reads these
 # (it only loads attachments/*), so they stay host-side ground truth, never model input.
 GROUND_TRUTH_FILES = ("arvo_script.txt", "ground_truth.txt", "fixed_output.txt", "meta.json")
@@ -50,6 +59,28 @@ class Bundle:
     arvo_script: str
     ground_truth: str
     fixed_output: str = field(repr=False, default="")
+
+
+def _free_gb(path: str = '/') -> float:
+    return shutil.disk_usage(path).free / 1e9
+
+
+def _pull_pair(aid: str) -> None:
+    """Pull both ARVO tags; raise RuntimeError if either fails (id then skipped)."""
+    for tag in (f'n132/arvo:{aid}-vul', f'n132/arvo:{aid}-fix'):
+        if subprocess.run(['docker', 'pull', '-q', tag], capture_output=True, timeout=3600).returncode:
+            raise RuntimeError(f'docker pull failed for {tag}')
+
+
+def _remove_images(aid: str, tags: tuple[str, ...]) -> None:
+    for tag in tags:
+        subprocess.run(['docker', 'rmi', '-f', f'n132/arvo:{aid}-{tag}'], capture_output=True, timeout=120)
+    subprocess.run(['docker', 'image', 'prune', '-f'], capture_output=True, timeout=600)
+
+
+def _free_fix_image(aid: str) -> None:
+    """Reclaim disk: drop the -fix image (kept only where the patch demo needs it) and prune layers."""
+    _remove_images(aid, ('fix',))
 
 
 def reproducer(script: str) -> tuple[list[str], str]:
@@ -171,6 +202,21 @@ def write_index(root: Path, rows: list[dict]) -> None:
     (root / 'IDS.md').write_text('\n'.join(lines) + '\n')
 
 
+def load_existing(root: Path) -> list[dict]:
+    """Already-validated rows, read from each arvo-*-with_poc/meta.json (deduped, ordered by id)."""
+    rows, seen = [], set()
+    for meta in sorted(root.glob('arvo-*-with_poc/meta.json'), key=lambda p: p.parent.name):
+        try:
+            row = json.loads(meta.read_text())
+        except (OSError, ValueError):
+            continue
+        aid = row.get('id')
+        if aid and aid not in seen:
+            seen.add(aid)
+            rows.append(row)
+    return rows
+
+
 def write_report(row: dict, directory: Path, mode: str, src_dir: str | None, llm) -> None:
     """C2 only: generate report.md from an allowlist of crash facts (no label, logs or meta)."""
     user = {key: row[key] for key in ('project', 'function', 'file', 'bug_type', 'fuzz_target')}
@@ -198,35 +244,76 @@ def main() -> None:
                         help='C1: prove pairs and lay out folders, zero model calls (report.md is C2)')
     parser.add_argument('--limit', type=int, help='use 2 for the first dry run')
     parser.add_argument('--timeout', type=int, default=60)
+    parser.add_argument('--pull', action='store_true',
+                        help='docker pull each -vul/-fix pair before validating (disk-guarded)')
+    parser.add_argument('--min-free-gb', type=float, default=25.0,
+                        help='with --pull: skip an id if free disk would drop below this')
+    parser.add_argument('--free-fix', action='store_true',
+                        help='after a pair validates, delete its -fix image (except --keep-fix) and prune')
+    parser.add_argument('--keep-fix', nargs='*', default=['42487096'],
+                        help='ids whose -fix image is retained (patch demo); default: 42487096')
+    parser.add_argument('--skip-validated', action='store_true',
+                        help='skip ids already validated under --out (and count them toward --stop-after)')
+    parser.add_argument('--stop-after', type=int,
+                        help='stop once this many ids are validated in total (existing + this run)')
     args = parser.parse_args()
     root = Path(args.out)
     root.mkdir(parents=True, exist_ok=True)
     modes = tuple(dict.fromkeys(args.modes))
+    keep_fix = set(args.keep_fix)
     tracer = Tracer('c1-arvo-validation')
     llm = None
     if not args.validate_only:
         from repro.llm import LLM
         llm = LLM.cheap(tracer=tracer)
-    rows, failed = [], []
+    rows = load_existing(root) if args.skip_validated else []
+    done = {r['id'] for r in rows}
+    failed = []
+    write_index(root, rows)
+    print(f'[start] {len(rows)} already validated; target {args.stop_after or "all"}; '
+          f'free {_free_gb():.0f}GB', flush=True)
     for aid in list(dict.fromkeys(args.ids))[:args.limit]:
+        if args.stop_after and len(rows) >= args.stop_after:
+            print(f'[done] reached {len(rows)} validated ids; stopping', flush=True)
+            break
+        if aid in done:
+            print(f'[have] {aid}: already validated', flush=True)
+            continue
+        t0 = time.time()
+        pull_s = 0.0
         try:
+            if args.pull:
+                if _free_gb() < args.min_free_gb:
+                    raise RuntimeError(f'free disk {_free_gb():.0f}GB below floor {args.min_free_gb:.0f}GB')
+                p0 = time.time()
+                _pull_pair(aid)
+                pull_s = time.time() - p0
             bundle = validate(aid, args.timeout, tracer)
+            if bundle.result['project'] in GIANT_PROJECTS:
+                tracer.log('error', 'excluded_giant', {'id': aid, 'project': bundle.result['project']})
+                _remove_images(aid, ('vul', 'fix'))
+                print(f'[excluded] {aid} {bundle.result["project"]} giant source tree; '
+                      f'not counted; free {_free_gb():.0f}GB', flush=True)
+                continue
             folders = materialize(root, bundle, modes)
             if llm:
                 for mode, folder in zip(modes, folders, strict=True):
                     write_report(bundle.result, root / folder, mode, args.src_dir, llm)
             rows.append(bundle.result)
-            print(f'[keep] {aid}: {bundle.result["project"]} {bundle.result["bug_type"]}; '
-                  f'fixed exit 0; folders: {", ".join(folders)}', flush=True)
+            done.add(aid)
+            if args.free_fix and aid not in keep_fix:
+                _free_fix_image(aid)
+            print(f'[validated] {aid} {bundle.result["project"]} {bundle.result["bug_type"]} '
+                  f'{time.time() - t0:.0f}s (pull {pull_s:.0f}s) total={len(rows)} free={_free_gb():.0f}GB',
+                  flush=True)
         except (ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             failed.append({'id': aid, 'reason': str(exc)})
             tracer.log('error', 'validation_rejected', failed[-1])
-            print(f'[skip] {aid}: {exc}', flush=True)
+            print(f'[failed] {aid} {time.time() - t0:.0f}s reason="{exc}"', flush=True)
         write_index(root, rows)
-    (root / 'rejected.json').write_text(json.dumps(failed, indent=2) + '\n')
-    print(f'{len(rows)} validated; {len(failed)} rejected; model calls: {llm.usage.calls if llm else 0}')
-    if failed:
-        raise SystemExit(1)
+        (root / 'rejected.json').write_text(json.dumps(failed, indent=2) + '\n')  # kept current after each id
+    print(f'[summary] {len(rows)} validated; {len(failed)} failed; '
+          f'model calls: {llm.usage.calls if llm else 0}', flush=True)
 
 
 if __name__ == '__main__':

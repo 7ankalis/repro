@@ -111,6 +111,14 @@ def test_materialize_text_only_drops_a_stale_poc(tmp_path: Path):
     assert not (stale / "poc.bin").exists()
 
 
+def test_load_existing_reads_only_with_poc_meta(tmp_path: Path):
+    assert brd.load_existing(tmp_path) == []
+    brd.materialize(tmp_path, _bundle(), brd.MODES)  # writes meta.json in both folders
+    rows = brd.load_existing(tmp_path)
+    assert [r["id"] for r in rows] == ["42487096"]  # text_only meta is not double-counted
+    assert rows[0]["project"] == "muparser"
+
+
 def test_write_index_lists_each_validated_id(tmp_path: Path):
     brd.write_index(tmp_path, [_bundle().result])
     text = (tmp_path / "IDS.md").read_text()

@@ -1,0 +1,33 @@
+{
+  "id": "1454",
+  "project": "pcre2",
+  "image": "n132/arvo:1454-vul",
+  "fixed_image": "n132/arvo:1454-fix",
+  "command": "/out/pcre2_fuzzer /work/c1-poc",
+  "poc_source": "/tmp/poc",
+  "poc_sha256": "951dcee3a7a4f3aac67ec76a2ce4469cc76df650f134bf2572bf60a65c982338",
+  "poc_bytes": 1,
+  "function": "do_callout",
+  "file": "/src/pcre2/src/pcre2_match.c",
+  "bug_type": "array-index-out-of-bounds",
+  "fuzz_target": "/out/pcre2_fuzzer",
+  "vulnerable": {
+    "cmd": "/out/pcre2_fuzzer /work/c1-poc",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "mesg: ttyname failed: Inappropriate ioctl for device\nINFO: Seed: 193978772\nINFO: Loaded 0 modules (0 guards): \n/out/pcre2_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\nsrc/pcre2_match.c:277:32: runtime error: index -2 out of bounds for type 'size_t [2]'\n    #0 0x475a10 in do_callout /src/pcre2/src/pcre2_match.c:277:32\n    #1 0x4656da in match /src/pcre2/src/pcre2_match.c:5228:11\n    #2 0x4635c6 in pcre2_match_8 /src/pcre2/src/pcre2_match.c:6637:8\n    #3 0x45590e in LLVMFuzzerTestOneInput /src/pcre2/src/pcre2_fuzzsupport.c:195:19\n    #4 0x43b8dd in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/libfuzzer/FuzzerLoop.cpp:458:13\n    #5 0x43bcb7 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long) /src/libfuzzer/FuzzerLoop.cpp:397:3\n    #6 0x42cde8 in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) /src/libfuzzer/FuzzerDriver.cpp:268:6\n    #7 0x431288 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/libfuzzer/FuzzerDriver.cpp:683:9\n    #8 0x42ca4c in main /src/libfuzzer/FuzzerMain.cpp:20:10\n    #9 0x74230558183f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2083f)\n    #10 0x405918 in _start (/out/pcre2_fuzzer+0x405918)\n\n",
+    "duration_s": 0.08,
+    "timed_out": false
+  },
+  "fixed": {
+    "cmd": "/out/pcre2_fuzzer /work/c1-poc",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "mesg: ttyname failed: Inappropriate ioctl for device\nINFO: Seed: 194284125\nINFO: Loaded 1 modules (6552 guards): [0x7a3530, 0x7a9b90), \n/out/pcre2_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\nExecuted /work/c1-poc in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n",
+    "duration_s": 0.07,
+    "timed_out": false
+  },
+  "checked_at": "2026-10-31T14:51:18.079944+00:00",
+  "mode": "text_only",
+  "directory": "arvo-1454-text_only"
+}
