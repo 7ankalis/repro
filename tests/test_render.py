@@ -37,6 +37,14 @@ def test_verified_with_validated_patch_shows_diff_not_the_note():
     assert "```diff" in md
 
 
+def test_patch_without_test_suite_says_no_tests_available():
+    patch = PatchResult(diff="--- a/foo.c\n+++ b/foo.c\n@@\n-bad\n+good\n",
+                        poc_still_crashes=False, build_ok=True, tests_ok=None)
+    md = render(_verified_verdict(patch))
+    assert "no tests available" in md
+    assert "Tests: pass" not in md          # never claim passing tests when there is no suite
+
+
 def test_non_verified_verdict_has_no_patch_note():
     v = Verdict(report_id="r2", kind=VerdictKind.NOT_REPRODUCED, confidence=0.2, headline="")
     md = render(v)
