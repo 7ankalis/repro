@@ -1,0 +1,5 @@
+AddressSanitizer:DEADLYSIGNAL
+==1== ERROR: libFuzzer: deadly signal
+    #0 0x123 in parse /src/parser.c:10:3
+NOTE: libFuzzer has rudimentary signal handlers.
+SUMMARY: libFuzzer: deadly signal

@@ -42,9 +42,10 @@ TOP_FRAMES = 6
 def _norm_fn(name: Optional[str]) -> str:
     if not name:
         return ""
+    name = re.sub(r"\s*\[clone [^]]+\]$", "", name)
     name = name.strip().split("(")[0]                    # drop C++ params and trailing qualifiers ("const")
     name = name.split("::")[-1]                          # drop namespaces / class
-    name = re.sub(r"\.(isra|constprop|part|cold|llvm)(\.\d+)*$", "", name)   # drop compiler clone suffixes
+    name = re.sub(r"(?:\.(?:isra|constprop|part|cold|llvm)(?:\.\d+)*)+$", "", name)   # drop compiler clone suffixes
     return name.strip().lower()
 
 

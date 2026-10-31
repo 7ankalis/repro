@@ -1,0 +1,11 @@
+==42==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x123 in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x234 in leak_buffer /src/parser.c:42:3
+
+Indirect leak of 16 byte(s) in 1 object(s) allocated from:
+    #0 0x123 in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x345 in other_alloc /src/parser.c:50:3
+
+SUMMARY: AddressSanitizer: 48 byte(s) leaked in 2 allocation(s).
