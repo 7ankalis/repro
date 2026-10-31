@@ -254,7 +254,8 @@ def test_factcheck_muparser_skips_non_source_refs():
     assert fc.checks[0].ref.file == 'src/muParserBase.cpp' and fc.checks[0].ref.line == 1242
     assert fc.hallucination_ratio == 0 and fc.quoted_code_found is None
     assert not fc.slop_signals
-    assert not any('/out' in cmd or '/work' in cmd or 'poc.bin' in cmd for cmd in sb.commands)
+    assert not any('/out' in cmd or '/work' in cmd or 'poc.bin' in cmd
+                   for cmd in sb.commands if not cmd.startswith('find /out '))
     assert decide(claim, fc, [_attempt(_fixture('arvo_42487096_muparser.log'))])[0] == VerdictKind.VERIFIED
     claim.code_refs.append(CodeRef(kind='function', name='HallucinatedFunction'))
     fc = FactChecker(sb).run(claim, attachments=['poc.bin'])
@@ -310,7 +311,9 @@ class FakePairSandbox:
         self.commands.append(cmd)
         args = shlex.split(cmd)
         code = 0
-        if args[0] == 'find':
+        if cmd.startswith("find /out "):
+            out = ""
+        elif args[0] == 'find':
             out = '\n'.join(p for p in self.files if p.rsplit('/', 1)[-1] == args[args.index('-name') + 1])
         elif args[0] == 'grep':
             separator = args.index('--')

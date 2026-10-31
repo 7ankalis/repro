@@ -18,8 +18,18 @@ def headline(v: Verdict) -> str:
         f = v.match.matched_frame
         return f"Reproduced: {v.attempts[v.winning_attempt - 1].sanitizer.error_type} in `{f.function}` ({f.file}:{f.line})"
     if v.kind == VerdictKind.INVALID_CLAIM and v.factcheck:
+        pair_evidence = [ch.evidence for ch in v.factcheck.checks
+                         if not ch.exists and ch.ref.kind == "function" and ch.ref.file]
+        if pair_evidence or v.factcheck.quoted_code_found is False:
+            reasons = pair_evidence[:3]
+            if v.factcheck.quoted_code_found is False:
+                reasons.append("Code quoted in the report does not appear in the source tree.")
+            return "Cited code does not match the source tree: " + "; ".join(reasons)
         missing = [ch.ref.name for ch in v.factcheck.checks if not ch.exists]
-        return f"Claim references code that does not exist: {', '.join(f'`{m}`' for m in missing[:3])}"
+        if missing:
+            return f"Claim references code that does not exist: {', '.join(f'`{m}`' for m in missing[:3])}"
+        reasons = v.factcheck.slop_signals[:3] or ["Fact-check evidence contradicts the cited code."]
+        return "Cited code does not match the source tree: " + "; ".join(reasons)
     if v.kind == VerdictKind.DIFFERENT_BUG:
         return "A sanitizer crash was found, but it does not match the reported bug"
     if v.kind == VerdictKind.NOT_REPRODUCED:
