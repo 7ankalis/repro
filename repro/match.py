@@ -105,6 +105,8 @@ def decide(
 
     if factcheck and factcheck.checks:
         key_names = {_norm_fn(claim.affected_function), _base(claim.affected_file)} - {""}
+        # A failed function/file pair retains the key function name in its CodeRef.
+        # It is a missing key even when the two individual checks passed.
         key_missing = any(
             not c.exists and (_norm_fn(c.ref.name) in key_names or _base(c.ref.name) in key_names)
             for c in factcheck.checks
