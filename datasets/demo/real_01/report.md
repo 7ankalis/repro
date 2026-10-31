@@ -1,6 +1,6 @@
 ---
 id: demo-real-01
-title: "REPLACE: e.g. Heap buffer overflow in <function> when evaluating a crafted expression"
+title: "Heap buffer over-read in mu::ParserBase::ParseCmdCodeBulk when evaluating a crafted expression"
 source: synthetic
 label: real
 target:
@@ -13,16 +13,24 @@ target:
   test_cmd: null
 ---
 ## Summary
-REPLACE: one or two sentences. "<bug type from `repro sanitize`> in `<top project function>` (`<file>`) when
-muparser evaluates a crafted expression."
+Evaluating a crafted expression string causes an 8-byte heap buffer over-read in
+`mu::ParserBase::ParseCmdCodeBulk()` (`src/muParserBase.cpp`, around line 1242). The read happens while the
+bytecode is being executed against the value stack, which suggests the stack buffer is sized for fewer values
+than the bytecode actually consumes for this expression.
 
 ## Details
-REPLACE: which function, which file, what input shape triggers it (look at the PoC bytes: `xxd attachments/poc.bin`).
-Do NOT paste the sanitizer stack trace.
+- Component: muparser expression evaluator
+- Function: `mu::ParserBase::ParseCmdCodeBulk(int, int) const`, called from `mu::ParserBase::ParseString()`
+  on the first evaluation of a new expression
+- Bug class: heap-buffer-overflow (READ of size 8, one `double` past the end of a heap allocation)
+- Found with the OSS-Fuzz `set_eval_fuzzer` harness (AddressSanitizer build)
 
 ## Reproduction
-The crashing input is attached as `poc.bin`. Run it against the `set_eval_fuzzer` fuzz target
-(an AddressSanitizer build): `/out/set_eval_fuzzer poc.bin`.
+The crashing input is attached as `poc.bin` (280 bytes). The harness sets the bytes as the expression and evaluates it:
+
+    /out/set_eval_fuzzer poc.bin
+
+AddressSanitizer reports a heap-buffer-overflow READ in `ParseCmdCodeBulk`.
 
 ## Impact
-Memory-safety bug reachable from untrusted expression strings.
+Out-of-bounds read reachable from any application that evaluates untrusted expression strings with muparser.

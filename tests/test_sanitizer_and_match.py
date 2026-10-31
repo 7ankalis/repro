@@ -142,3 +142,32 @@ def test_not_reproduced_and_out_of_scope():
     assert decide(claim, fc, [])[0] == VerdictKind.NOT_REPRODUCED
     claim2 = Claim(summary="s", bug_class=BugClass.non_memory, trigger_description="t")
     assert decide(claim2, None, [])[0] == VerdictKind.OUT_OF_SCOPE
+
+
+MUPARSER_REAL = """
+==14==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6060000002f8 at pc 0x0000005a3c1e bp 0x7ffe sp 0x7ffe
+READ of size 8 at 0x6060000002f8 thread T0
+    #0 0x5a3c1d in mu::ParserBase::ParseCmdCodeBulk(int, int) const /src/muparser/src/muParserBase.cpp:1242:10
+    #1 0x5a5f2b in mu::ParserBase::ParseString() const /src/muparser/src/muParserBase.cpp:1520:10
+    #2 0x4f1a2c in LLVMFuzzerTestOneInput /src/set_eval_fuzzer.cc:27:12
+    #3 0x4f0e11 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:559:15
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /src/muparser/src/muParserBase.cpp:1242:10 in mu::ParserBase::ParseCmdCodeBulk(int, int) const
+"""
+
+
+def test_real_muparser_cpp_const_method_matches():
+    rep = sanitizer.parse(MUPARSER_REAL)
+    assert rep.error_type == "heap-buffer-overflow" and rep.access == "READ" and rep.access_size == 8
+    for claimed in ("ParseCmdCodeBulk", "mu::ParserBase::ParseCmdCodeBulk", "ParserBase::ParseCmdCodeBulk()",
+                    "mu::ParserBase::ParseCmdCodeBulk(int, int) const"):
+        claim = Claim(summary="s", bug_class=BugClass.heap_buffer_overflow, affected_function=claimed,
+                      affected_file="src/muParserBase.cpp", trigger_description="t")
+        kind, conf, *_ = decide(claim, None, [_attempt(MUPARSER_REAL)])
+        assert kind == VerdictKind.VERIFIED and conf >= 0.75, claimed
+
+
+def test_clone_suffix_normalized():
+    from repro.match import _norm_fn
+    assert _norm_fn("png_read_row.isra.0") == "png_read_row"
+    assert _norm_fn("xmlParseCharRef.constprop.2") == "xmlparsecharref"
