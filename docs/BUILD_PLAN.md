@@ -101,7 +101,7 @@ secrets) · **GPT** = ChatGPT Pro (chat / deep research) · **Z** = you in Zed �
 | D1 | Dashboard v1: KPIs, queue, run page, escaping intact | — (use `examples/`) | CXc | – | renders the 3 example runs |
 | D2 | Demo view: report ↔ evidence split screen, matched frame highlighted, live SSE trace | D1 | CXc | – | screen-recordable at 1080p |
 | D3 | GitHub bot on a demo repo you own | G1 | CX | ✓ | comment + label appear on a test issue |
-| D4 | Patch quality: tune `patcher.md` until ≥ 1 patch validates; compare against the upstream fix | G2 | CC | ✓ | `patch.json` valid → **G4** |
+| D4 ✅ | Patch quality: tune `patcher.md` until ≥ 1 patch validates; compare against the upstream fix | G2 | CC | ✓ | `patch.json` valid → **G4** |
 | D5 | README final (problem + sources, GIF, results, Meta tooling, security, limitations) | G5 | GPT (draft) + CC (edit in repo) | – | DEMO_AND_SUBMISSION checklist ✓ |
 | D6 | (stretch) Muse Code as the headless patch worker | G4 | MC | ✓ | 1 validated patch produced by Muse Code |
 

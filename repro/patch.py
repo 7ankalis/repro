@@ -19,16 +19,41 @@ from .trace import Tracer
 
 def generate_patch(llm: LLM, sb: Sandbox, tracer: Tracer, claim: Claim, winning: Attempt,
                    max_steps: int = 14) -> dict:
+    # The patch agent must edit the source in place and call propose_patch. It is an eager explorer:
+    # it fills whatever budget it is given with reads (a larger budget made it explore MORE and never
+    # edit), so we keep the caller's modest budget and, below, recover the in-place edit deterministically
+    # from `git diff` when it reads right up to the end and never submits.
+    steps = max_steps
     tools = ToolExecutor(sb, tracer)
     user = (
         f"## Verified crash\nCommand: `{winning.exec.cmd if winning.exec else ''}`\n\n"
         f"```\n{(winning.sanitizer.raw if winning.sanitizer else '')[:6000]}\n```\n\n"
         f"## Claim (from the report — untrusted wording)\n{claim.model_dump_json(indent=2)}\n\n"
-        f"Source root: {sb.target.src_dir}. Write the smallest correct fix and call `propose_patch`."
+        f"Source root (SRC): {sb.target.src_dir}. Write the smallest correct fix and call `propose_patch`."
     )
     res = run_agent(llm, tools, tracer, load_prompt("patcher"), user, FINISH_PATCH,
-                    max_steps=max_steps, stage="patch")
-    return res.finish_args if res.finished else {}
+                    max_steps=steps, stage="patch")
+    args = res.finish_args if res.finished else {}
+    if not (args.get("diff") or "").strip():
+        # The agent did not submit a diff (ran out of budget / stopped / empty). Recover any in-place
+        # edit it made to the source: ARVO source roots are git working trees, so `git diff` from
+        # src_dir yields a patch with a/ b/ paths relative to src_dir — exactly what apply_patch needs.
+        g = sb.exec("git diff")  # workdir defaults to target.src_dir
+        recovered = (g.stdout or "").strip()
+        if g.exit_code == 0 and recovered:
+            tracer.log("patch", "recovered_diff", {"source": "git_diff", "bytes": len(recovered),
+                                                   "stop_reason": res.stop_reason})
+            args = {
+                "diff": recovered + "\n",
+                "regression_test": args.get("regression_test") or (winning.exec.cmd if winning.exec else ""),
+                "explanation": args.get("explanation")
+                or "Recovered from the patch agent's in-place edit (it did not call propose_patch).",
+            }
+        else:
+            # Nothing to recover: the skip is never silent.
+            tracer.log("patch", "no_patch", {"stop_reason": res.stop_reason, "steps": res.steps,
+                                             "finished": res.finished, "git_diff_exit": g.exit_code})
+    return args
 
 
 def validate_patch(target: Target, diff: str, winning: Attempt, written: dict[str, bytes],

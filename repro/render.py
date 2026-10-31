@@ -61,6 +61,10 @@ def render(v: Verdict) -> str:
         L.append(f"- Builds: {'yes' if p.build_ok else 'no'} · PoC fixed: {'yes' if not p.poc_still_crashes else 'no'} · "
                  f"Tests: {'n/a' if p.tests_ok is None else ('pass' if p.tests_ok else 'FAIL')}")
         L.append("```diff\n" + p.diff[:6000] + "\n```")
+    elif v.kind == VerdictKind.VERIFIED:
+        L.append("### Proposed fix")
+        L.append("No validated patch produced — the patch step did not return a diff that applies, "
+                 "builds and stops the crash in a fresh container. The crash evidence above still stands.")
 
     if v.kind == VerdictKind.NOT_REPRODUCED:
         L.append("> Not reproduced ≠ not vulnerable. All attempts are in the evidence trace; "
