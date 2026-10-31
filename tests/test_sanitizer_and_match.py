@@ -384,3 +384,83 @@ def test_pair_excludes_non_source_refs_and_requires_individual_matches():
     sb.grep_error = True
     with pytest.raises(RuntimeError, match='grep exited 2'):
         FactChecker(sb).run(_pair_claim())
+
+
+# --------------------------------------------------------------------------- #
+# B5: trigger fidelity (slop-curl-real-2819666: %x claim, agent-invented %s%n crash)
+# --------------------------------------------------------------------------- #
+ASAN_MPRINTF = """
+==42==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000010 (pc 0x5612 bp 0x7ffd sp 0x7ffd T0)
+==42==The signal is caused by a READ memory access.
+    #0 0x5612 in formatf /src/curl/lib/mprintf.c:840:11
+    #1 0x5613 in curl_mvfprintf /src/curl/lib/mprintf.c:1171:9
+    #2 0x5614 in curl_mfprintf /src/curl/lib/mprintf.c:1160:9
+    #3 0x5615 in main /work/t2.c:5:3
+SUMMARY: AddressSanitizer: SEGV /src/curl/lib/mprintf.c:840:11 in formatf
+"""
+
+_CLAIMED_POC = ('#include <stdio.h>\n#include "curl_printf.h"\nint main() {\n'
+                'char* user_input = "%x %x %x %x";\ncurl_mfprintf(stdout, user_input);\nreturn 0;\n}\n')
+_INVENTED_POC = ('#include <stdio.h>\n#include <curl/mprintf.h>\nint main() {\n'
+                 'curl_mfprintf(stdout, "%s%s%s%n");\nreturn 0;\n}\n')
+
+
+def _fmt_claim() -> Claim:
+    return Claim(summary="format string in curl_mfprintf", bug_class=BugClass.other_memory,
+                 affected_function="curl_mfprintf", affected_file="lib/mprintf.c",
+                 trigger_description="pass user-controlled '%x %x %x %x' as the format to curl_mfprintf",
+                 has_poc=True, poc_kind="c_harness", poc_text=_CLAIMED_POC)
+
+
+def _harness_attempt(n: int, src: str, crash: str | None) -> Attempt:
+    cmd = f"gcc -fsanitize=address -o /work/{src} /work/{src}.c -lcurl && /work/{src}"
+    return Attempt(n=n, strategy="agent_command", description="run harness",
+                   exec=ExecResult(cmd=cmd, exit_code=1 if crash else 0, stdout="", stderr=crash or "",
+                                   duration_s=1.0),
+                   sanitizer=sanitizer.parse(crash) if crash else None)
+
+
+def test_invented_trigger_crash_is_different_bug_not_verified():
+    claim = _fmt_claim()
+    fc = FactCheckResult(checks=[], hallucination_ratio=0.5, quoted_code_found=False,
+                         slop_signals=["curl_printf.h is internal", "x", "y", "z", "w"])
+    sources = {"/work/t1.c": _CLAIMED_POC.encode(), "/work/t2.c": _INVENTED_POC.encode()}
+    attempts = [_harness_attempt(1, "t1", None), _harness_attempt(2, "t2", ASAN_MPRINTF)]
+    # Class + location match on their own would say VERIFIED ...
+    assert match_claim(claim, attempts[1].sanitizer).location_match
+    # ... but the crash came from %s/%n, which the report never cited.
+    kind, conf, win, m = decide(claim, fc, attempts, sources)
+    assert kind == VerdictKind.DIFFERENT_BUG and win == 2
+    assert "%n" in m.explanation and "%s" in m.explanation and conf >= 0.7
+
+
+def test_invented_trigger_never_verified_even_if_factcheck_clean():
+    claim = _fmt_claim()
+    sources = {"/work/t2.c": _INVENTED_POC.encode()}
+    kind, conf, *_ = decide(claim, None, [_harness_attempt(1, "t2", ASAN_MPRINTF)], sources)
+    assert kind == VerdictKind.DIFFERENT_BUG and conf == 0.5
+
+
+def test_faithful_trigger_still_verified():
+    claim = _fmt_claim()
+    sources = {"/work/t1.c": _CLAIMED_POC.encode()}
+    kind, _, win, _ = decide(claim, None, [_harness_attempt(1, "t1", ASAN_MPRINTF)], sources)
+    assert kind == VerdictKind.VERIFIED and win == 1
+
+
+def test_faithful_crash_preferred_over_divergent_one():
+    claim = _fmt_claim()
+    sources = {"/work/t1.c": _CLAIMED_POC.encode(), "/work/t2.c": _INVENTED_POC.encode()}
+    atts = [_harness_attempt(1, "t2", ASAN_MPRINTF), _harness_attempt(2, "t1", ASAN_MPRINTF)]
+    kind, _, win, _ = decide(claim, None, atts, sources)
+    assert kind == VerdictKind.VERIFIED and win == 2
+
+
+def test_fidelity_check_ignores_claims_without_specifiers_and_reporter_pocs():
+    from repro.match import trigger_divergence
+    plain = Claim(summary="s", bug_class=BugClass.heap_buffer_overflow, affected_function="xmlParseCharRef",
+                  trigger_description="a 100% sure overflow on a long char ref")   # prose "% s" is not a spec
+    att = _harness_attempt(1, "t2", ASAN_HBO)
+    assert trigger_divergence(plain, att, {"/work/t2.c": _INVENTED_POC}) is None
+    rp = att.model_copy(update={"strategy": "reporter_poc"})
+    assert trigger_divergence(_fmt_claim(), rp, {"/work/t2.c": _INVENTED_POC}) is None

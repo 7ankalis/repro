@@ -89,6 +89,7 @@ def triage(report: Report, cfg: Config | None = None, runs_root: str = "runs") -
 
                 def verified_already() -> bool:
                     return any(a.sanitizer and match.match_claim(claim, a.sanitizer).score >= match.VERIFY_THRESHOLD
+                               and match.is_faithful(claim, a, tools.written)
                                for a in tools.attempts)
 
                 prepass_commands = tools.run_reporter_pocs(poc_paths)
@@ -115,7 +116,7 @@ def triage(report: Report, cfg: Config | None = None, runs_root: str = "runs") -
                 tracer.log("verdict", "fast_reject", {"hallucination_ratio": fc.hallucination_ratio})
 
             v.attempts = tools.attempts
-            kind, conf, win, m = match.decide(claim, fc, tools.attempts)
+            kind, conf, win, m = match.decide(claim, fc, tools.attempts, tools.written)
             v.kind, v.confidence, v.winning_attempt, v.match = kind, conf, win, m
 
             if kind == VerdictKind.VERIFIED:
