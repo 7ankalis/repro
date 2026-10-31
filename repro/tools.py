@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import shlex
+from pathlib import PurePosixPath
 from typing import Any, Callable, Optional
 
 from . import sanitizer
@@ -123,16 +124,40 @@ class ToolExecutor:
         self.written[path] = data
         return f"wrote {len(data)} bytes to {path}"
 
+    def run_reporter_pocs(self, paths: list[str]) -> list[str]:
+        """Run attached inputs on at most 12 discovered executables, entirely in Sandbox."""
+        if not paths:
+            return []
+        listing = self.sb.exec("find /out -maxdepth 1 -type f -executable -print0", timeout=30, workdir="/")
+        if listing.exit_code != 0:
+            raise RuntimeError("Unable to list executable PoC targets in /out")
+        targets = sorted({p for p in listing.stdout.split("\0") if p
+                          and PurePosixPath(p).parent == PurePosixPath("/out")
+                          and PurePosixPath(p).name != "arvo"
+                          and not p.endswith((".zip", ".dict", ".options", ".txt"))})[:12]
+        commands = []
+        for target in targets:
+            for path in paths:
+                cmd = f"{shlex.quote(target)} {shlex.quote(path)}"
+                self._run(cmd, f"Attached PoC pre-pass: {target} on {path}", 20, "reporter_poc")
+                commands.append(cmd)
+        return commands
+
     def t_run(self, cmd: str, purpose: str = "", timeout: int = 120) -> str:
+        return self._run(cmd, purpose, timeout, "agent_command")
+
+    def _run(self, cmd: str, purpose: str, timeout: int, strategy: str) -> str:
         for pat in DENY_PATTERNS:
             if re.search(pat, cmd):
                 return "DENIED: this command is not allowed in the sandbox (eval integrity / no network)."
         r = self.sb.exec(cmd, timeout=min(int(timeout), 600))
         rep = sanitizer.parse(r.stderr + "\n" + r.stdout)
-        att = Attempt(n=len(self.attempts) + 1, strategy="agent_command", description=purpose or cmd, exec=r, sanitizer=rep)
+        att = Attempt(n=len(self.attempts) + 1, strategy=strategy, description=purpose or cmd, exec=r, sanitizer=rep)
         self.attempts.append(att)
         self.tracer.log("sanitizer", "attempt", {"n": att.n, "cmd": cmd, "exit": r.exit_code,
-                                                 "crash": rep.error_type if rep else None})
+                                                 "crash": rep.error_type if rep else None,
+                                                 "strategy": att.strategy, "description": att.description,
+                                                 "timed_out": r.timed_out, "duration_s": r.duration_s})
         if rep:
             self.tracer.save_artifact(f"attempt_{att.n}_sanitizer.txt", rep.raw)
         if self.on_attempt:
