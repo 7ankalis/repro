@@ -19,7 +19,7 @@ from .trace import Tracer
 RESULT_CHARS = 6000
 
 # Eval integrity: the ARVO `arvo` command replays the ground-truth PoC. The agent must earn the crash.
-DENY_PATTERNS = [r"(^|[\s;&|(`])arvo\b(?!\s+compile)",r"\bcurl\s+http", r"\bwget\b", r"\bpip install\b"]
+DENY_PATTERNS = [r"/tmp/poc\b", r"(^|[\s;&|(`])arvo\b(?!\s+compile)",r"\bcurl\s+http", r"\bwget\b", r"\bpip install\b"]
 
 TOOL_SPECS: list[dict[str, Any]] = [
     {"type": "function", "function": {

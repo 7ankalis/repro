@@ -56,6 +56,15 @@ class Sandbox:
         if out.returncode != 0:
             raise RuntimeError(f"docker run failed: {out.stderr.strip()}")
         self.cid = out.stdout.strip()
+        if self.target.scrub_paths:
+            paths = " ".join(shlex.quote(p) for p in self.target.scrub_paths)
+            subprocess.run(["docker", "exec", self.cid, "rm", "-rf", *self.target.scrub_paths],
+                           capture_output=True, timeout=60)
+            check = subprocess.run(["docker", "exec", self.cid, "sh", "-c", f"ls -d {paths} 2>/dev/null"],
+                                   capture_output=True, text=True, timeout=60)
+            if check.stdout.strip():
+                self.stop()
+                raise RuntimeError(f"could not scrub ground-truth paths: {check.stdout.strip()}")
         return self
 
     def stop(self) -> None:

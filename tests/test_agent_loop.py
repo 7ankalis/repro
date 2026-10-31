@@ -64,6 +64,7 @@ def test_arvo_replay_is_denied(tmp_path):
     assert tools("run", json.dumps({"cmd": "arvo", "purpose": "x"})).startswith("DENIED")
     assert tools("run", json.dumps({"cmd": "cd /src && arvo", "purpose": "x"})).startswith("DENIED")
     assert not tools("run", json.dumps({"cmd": "arvo compile", "purpose": "x"})).startswith("DENIED")
+    assert tools("run", json.dumps({"cmd": "/out/set_eval_fuzzer /tmp/poc", "purpose": "x"})).startswith("DENIED")
 
 
 def test_early_stop(tmp_path):

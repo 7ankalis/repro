@@ -30,6 +30,9 @@ class Target(BaseModel):
     build_cmd: str = "arvo compile"               # rebuild with sanitizers
     repro_cmd: Optional[str] = "arvo"             # known reproducer (ARVO). None for non-ARVO targets
     test_cmd: Optional[str] = None                # project test suite, used for patch validation
+    # Files removed from the container before anyone looks at it. ARVO images ship the ground-truth PoC at /tmp/poc:
+    # leaving it there would let the agent "reproduce" by replaying it (eval contamination).
+    scrub_paths: list[str] = Field(default_factory=lambda: ["/tmp/poc"])
 
 
 class Report(BaseModel):

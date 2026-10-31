@@ -12,11 +12,13 @@ curl:
 
 # Fill these from ARVO-Meta (task C1). Prefer small C libraries with fast builds:
 # libxml2, libyaml, libpng, libjpeg-turbo, lcms, libexif, mruby, binutils (avoid ffmpeg / big C++ monsters)
-arvo_example:
-  project: libxml2
-  image: n132/arvo:REPLACE_ID-vul
-  fixed_image: n132/arvo:REPLACE_ID-fix
-  src_dir: /src/libxml2
+# Verified layout (ARVO 42487096): fuzz target /out/<name>, harness source /src/<name>.cc, project /src/<project>,
+# ground-truth PoC /tmp/poc (scrubbed by Sandbox.start), `compile` = OSS-Fuzz build script.
+arvo_42487096:
+  project: muparser
+  image: n132/arvo:42487096-vul
+  fixed_image: n132/arvo:42487096-fix
+  src_dir: /src/muparser
   build_cmd: "arvo compile"
   repro_cmd: "arvo"
   test_cmd: null
