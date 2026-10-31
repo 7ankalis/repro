@@ -1,7 +1,10 @@
 """Render a Verdict as the maintainer-facing markdown comment (GitHub issue / dashboard). Deterministic."""
 from __future__ import annotations
 
-from .schemas import Verdict, VerdictKind
+import re
+from typing import Optional
+
+from .schemas import StackFrame, Verdict, VerdictKind
 
 ICON = {
     VerdictKind.VERIFIED: "✅", VerdictKind.DIFFERENT_BUG: "⚠️", VerdictKind.INVALID_CLAIM: "❌",
@@ -78,3 +81,47 @@ def render(v: Verdict) -> str:
     L.append(f"<sub>{len(v.attempts)} attempts · {v.duration_s:.0f}s · ${v.cost_usd:.3f} · "
              f"trace: `{v.trace_path}` · Repro never marks a report VERIFIED without sanitizer evidence.</sub>")
     return "\n".join(L)
+
+
+# --------------------------------------------------------------------------- #
+# Display helpers for the dashboard demo view (D2). Return RAW text: the page escapes it.
+# --------------------------------------------------------------------------- #
+_FRAME = re.compile(r"^\s*#(\d+)\s")
+
+
+def sanitizer_lines(raw: str, frame: Optional[StackFrame] = None, max_lines: int = 30) -> list[dict]:
+    """Split a sanitizer block into lines tagged for display: 'hit' (the matched frame), 'frame', 'error',
+    'summary' or ''. Only the frame with the matched index (and function, when known) is a hit."""
+    out = []
+    for line in raw.rstrip("\n").splitlines()[:max_lines]:
+        m = _FRAME.match(line)
+        if m:
+            hit = (frame is not None and int(m.group(1)) == frame.index
+                   and (not frame.function or frame.function in line))
+            kind = "hit" if hit else "frame"
+        elif "ERROR: " in line or line.startswith(("==", "READ of", "WRITE of")) or "runtime error:" in line:
+            kind = "error"
+        elif line.startswith("SUMMARY:"):
+            kind = "summary"
+        else:
+            kind = ""
+        out.append({"text": line, "kind": kind})
+    return out
+
+
+def diff_lines(diff: str, max_lines: int = 40) -> list[dict]:
+    """Tag unified-diff lines: 'file', 'hunk', 'add', 'del' or 'ctx'."""
+    out = []
+    for line in diff.rstrip("\n").splitlines()[:max_lines]:
+        if line.startswith(("+++", "---")):
+            kind = "file"
+        elif line.startswith("@@"):
+            kind = "hunk"
+        elif line.startswith("+"):
+            kind = "add"
+        elif line.startswith("-"):
+            kind = "del"
+        else:
+            kind = "ctx"
+        out.append({"text": line, "kind": kind})
+    return out
