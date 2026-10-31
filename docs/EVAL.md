@@ -25,7 +25,7 @@ The results table is what separates Repro from "an LLM that reads bug reports". 
 | slop_invalid_claim_pct | slop → INVALID_CLAIM (strong, evidence-backed rejection) | cheap, explainable rejections |
 | false_verified_on_slop | slop → VERIFIED (must be 0) | the trust guarantee |
 | patches_valid / attempted | patch applies, builds, PoC fixed, tests pass | "fix & prove" |
-| median_minutes, median_cost_usd | per report | vs 2–8 h of human triage |
+| median_minutes, median_cost_usd | per report | vs 1–8 h of human triage |
 
 Split recall by with_poc vs text_only — expect with_poc ≫ text_only; say so.
 

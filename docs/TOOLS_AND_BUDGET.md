@@ -83,5 +83,5 @@ and the task prompt stable and at the start of the message list (A6 must not reo
 - Before any bulk script: a dry run on 2 items, then extrapolate.
 - Check `repro spend` at every merge. If a bucket is at 80%, stop that activity.
 - Never use `*-contributor` model variants with real reports (`llm.py` refuses).
-- Cost per report is a **headline metric** ("$0.0X per report vs 2–8 hours of maintainer time"), so keep the
+- Cost per report is a **headline metric** ("$0.0X per report vs 1–8 hours of maintainer time"), so keep the
   `REPRO_PRICE_*` values in `.env` accurate.

@@ -88,5 +88,5 @@ that would raise the total score most, in priority order.
 ```
 Give me primary sources (links + one-line fact each) for: curl ending its bug bounty in Jan 2026 over AI slop;
 HackerOne pausing the Internet Bug Bounty in 2026; Linux kernel guidance on AI-found bugs requiring reproduction
-evidence; Google suspending OSS VRP product submissions from Oct 1, 2026; OpenSSF on triage taking 2–8 hours per report.
+evidence; Google suspending OSS VRP product submissions from Oct 1, 2026; OpenSSF on triage taking 1–8 hours per report.
 ```

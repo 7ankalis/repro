@@ -6,7 +6,7 @@
 AI made writing a plausible vulnerability report nearly free; verifying one still costs a maintainer hours.
 In 2026 that asymmetry broke disclosure: curl ended its bug bounty (Jan 31), HackerOne paused the Internet
 Bug Bounty, the Linux kernel now asks for reproduction evidence and ideally a tested patch, and Google suspended
-OSS VRP product submissions from Oct 1, 2026. OpenSSF puts triage at 2–8 hours per report.
+OSS VRP product submissions from Oct 1, 2026. OpenSSF puts triage at 1–8 hours per report.
 
 ## What Repro does
 Input: a vulnerability report (text + optional PoC) and a target (Docker image with the source tree, built with sanitizers).

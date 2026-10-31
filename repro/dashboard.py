@@ -33,7 +33,7 @@ POLL_S = 0.5            # live tail: how often trace.jsonl is re-read
 LIVE_IDLE_S = 1800.0    # live tail: give up after this long without a new event
 MAX_DELAY_S = 5.0
 app = FastAPI(title="Repro")
-HUMAN_TRIAGE_HOURS = 2.0  # conservative low end of OpenSSF's 2–8h per report
+HUMAN_TRIAGE_HOURS = 2.0  # inside OpenSSF's 1–8 h range (conservative)
 
 
 def _runs() -> list[dict]:

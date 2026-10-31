@@ -6,7 +6,7 @@
 **Problem question:** can machines verify vulnerability reports as fast as machines now write them?
 
 In 2026, AI made writing a convincing vulnerability report nearly free, while checking one still takes a maintainer
-2–8 hours. curl ended its bug bounty, HackerOne paused the Internet Bug Bounty, the Linux kernel now asks for
+1–8 hours. curl ended its bug bounty, HackerOne paused the Internet Bug Bounty, the Linux kernel now asks for
 reproduction evidence and a tested patch, and Google suspended OSS VRP product submissions from October 1, 2026.
 
 Repro takes an incoming report, builds the project in a network-less sandbox with AddressSanitizer/UBSan, and lets a
