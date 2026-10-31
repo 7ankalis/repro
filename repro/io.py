@@ -15,6 +15,9 @@ import yaml
 
 from .schemas import Report, Target
 
+# Evaluation-only files: never loaded as attachments, so no model can ever see them (AGENTS.md invariant 4).
+EVAL_ONLY_FILES = frozenset({"meta.json", "ground_truth.txt"})
+
 
 def load_report(path: str | Path) -> Report:
     p = Path(path)
@@ -29,7 +32,7 @@ def load_report(path: str | Path) -> Report:
     adir = p.parent / "attachments"
     if adir.is_dir():
         for f in sorted(adir.iterdir()):
-            if f.is_file():
+            if f.is_file() and f.name not in EVAL_ONLY_FILES:
                 raw = f.read_bytes()
                 try:
                     attachments[f.name] = raw.decode("utf-8")
