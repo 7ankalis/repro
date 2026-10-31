@@ -34,3 +34,19 @@
   public-disclosure URL + dates + rejection rationale live in each folder's `meta.json`.
 - If desired: a Human could add a `"hackerone_disclosed"` literal to `Report.source`; then flip the
   front matter + `tests/test_slop_curl_dataset.py` assertion. Not required for the eval to work.
+
+## [C2] real-report generation — notes for other areas
+- Who: C2 (`scripts/gen_real_reports.py`, `prompts/report_from_arvo.md`, `datasets/real/*/report.md`).
+- Ground truth and the generator: the generator model sees **no** raw `ground_truth.txt`/`meta.json`/PoC bytes.
+  `crash_facts()` reduces the sanitizer log to an allowlist (crash fn/file/line, bug class, access in words, caller
+  *names*, freed/allocated-by *names*, harness name; no addresses or frame lines). This is dataset authoring; the
+  triage agent still only sees `report.md` + `attachments/` (invariant 4 unchanged).
+- Cost: Baseten prices are `0` in `.env` (`REPRO_CHEAP_PRICE_IN/OUT`), so `$` shows 0.0000. Tokens are exact:
+  22 calls, 30,881 in / 15,189 out (≈1.4k in / 0.7k out per report). Per-folder numbers: `meta.json.report_generation`
+  and `datasets/real/GENERATION.md`. Set real prices and the same script reports dollars.
+- (C2 → area B) `sanitizer.parse` sets `error_type="attempting"` for ASan "attempting free on address which was not
+  malloc()-ed" (arvo-11504, libxml2); the SUMMARY line says `bad-free`. C2 reads the SUMMARY for its facts, but
+  `match.py` comparisons and IDS.md still see "attempting". Suggest mapping it to `bad-free` (and "attempting
+  double-free" → `double-free`).
+- `build_real_dataset.py` no longer calls a model (its old C1 `write_report` stub had no output checks and a stale
+  prompt contract); `--validate-only` is kept as a no-op flag.

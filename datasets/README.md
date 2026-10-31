@@ -3,7 +3,7 @@
 ```
 datasets/
   demo/         the 3–4 reports used in the demo video (hand-picked, rehearsed)
-  real/         real bugs from ARVO   (label: real)  — scripts/build_real_dataset.py
+  real/         real bugs from ARVO   (label: real)  — scripts/build_real_dataset.py (folders) + scripts/gen_real_reports.py (report.md)
   slop_curl/    real public AI-slop reports sent to curl, rewritten into report.md (label: slop) — task C4
   slop_synth/   synthetic slop         (label: slop)  — scripts/gen_slop.py
 ```

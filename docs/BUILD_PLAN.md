@@ -88,7 +88,7 @@ secrets) · **GPT** = ChatGPT Pro (chat / deep research) · **Z** = you in Zed �
 | ID | Task | Needs | Tool | Docker | Acceptance |
 |---|---|---|---|---|---|
 | C1 ✅ | ARVO shortlist: 20–25 ids from small C libraries; finish the PoC-copy TODO in `build_real_dataset.py`; keep only ids that crash on -vul and not on -fix | G0, R2 | CX | ✓ | ≥ 20 validated ids in `datasets/real/IDS.md` — **done: 11 validated** across 8 small libs (owner accepted 11; Docker Hub throttling stalled further pulls). Both report folders per id (with_poc + text_only); builder pulls/validates/frees `-fix`, rejects giant trees (llvm/skia/…). |
-| C2 | Real reports: 10 with_poc (+ 10 text_only as a stretch) via Baseten | C1 | CX | ✓ | hand-read 3: realistic, no stack traces |
+| C2 ✅ | Real reports: 10 with_poc (+ 10 text_only as a stretch) via Baseten | C1 | CX | ✓ | hand-read 3: realistic, no stack traces — **done: 22 report.md** (11 with_poc + 11 text_only) via `scripts/gen_real_reports.py`; every output machine-checked (no trace/address/banner, no ARVO/OSS-Fuzz, no fix talk, PoC iff with_poc); hand-read 1454, 15373, 49546 pairs. Tokens per report in `datasets/real/GENERATION.md`. |
 | C3 ✅ | Synthetic slop: `gen_slop.py` → 15 reports over 5 failure modes, generated on Baseten | G1 | CX | ✓ | 15 folders + meta.json |
 | C4 | Real curl slop: 5–10 public reports → `datasets/slop_curl/` | R1 | CX | – | folders + sources listed in `datasets/slop_curl/SOURCES.md` → **G3** (with C2, C3) |
 | C5 | Eval extras: `--baseline llm_judge` mode + chart PNG (Repro vs LLM-judge) | G1 | CXc | – | code + test with a fake LLM; the chart is generated from a sample JSON |
