@@ -13,11 +13,16 @@ from collections.abc import Iterable
 from pathlib import PurePosixPath
 from typing import Optional
 
+from .patch import PROTECTED_PATTERNS  # D4b's harness/build list: what we never patch, we never fact-check either
 from .sandbox import Sandbox
 from .schemas import Claim, CodeRef, FactCheckResult, RefCheck
 
 SRC_GLOBS = "--include=*.c --include=*.h --include=*.cc --include=*.cpp --include=*.cxx --include=*.hpp --include=*.hh --include=*.inc"
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_:~]*$")
+# libFuzzer driver entrypoints: defined by the harness, never by the project under test.
+FUZZ_ENTRYPOINTS = frozenset({"LLVMFuzzerTestOneInput", "LLVMFuzzerInitialize",
+                              "LLVMFuzzerCustomMutator", "LLVMFuzzerCustomCrossOver"})
+HARNESS_GLOBS = "--include=*.c --include=*.cc --include=*.cpp --include=*.cxx"
 
 
 class FactChecker:
@@ -26,6 +31,7 @@ class FactChecker:
         self.src = sb.target.src_dir
         self._idents: Optional[list[str]] = None
         self._out_names: Optional[set[str]] = None
+        self._harness: Optional[set[str]] = None
 
     # ------------------------------------------------------------------ helpers
     def _out_executables(self) -> set[str]:
@@ -35,6 +41,35 @@ class FactChecker:
             self._out_names = {PurePosixPath(p).name for p in result.stdout.split("\0")
                                if p and PurePosixPath(p).parent == PurePosixPath("/out")}
         return self._out_names
+
+    def _harness_files(self) -> set[str]:
+        """Fuzz harness sources (files defining LLVMFuzzerTestOneInput). ARVO keeps them in /src next to the
+        project tree, e.g. /src/set_eval_fuzzer.cc, so search /src rather than only src_dir. Found once."""
+        if self._harness is None:
+            root = "/src" if PurePosixPath(self.src).parts[:2] == ("/", "src") else self.src
+            r = self.sb.exec(f"grep -rIl {HARNESS_GLOBS} -- LLVMFuzzerTestOneInput {shlex.quote(root)} | head -200",
+                             timeout=180, workdir="/")
+            self._harness = {h.strip() for h in r.stdout.splitlines() if h.strip().startswith("/")}
+        return self._harness
+
+    def _is_harness_ref(self, ref: CodeRef) -> bool:
+        """True for refs to the fuzz driver rather than the project: /out binaries, /work scratch, harness
+        sources (by PROTECTED_PATTERNS or by defining LLVMFuzzerTestOneInput), their stems, and entrypoints.
+        Pure pattern checks run first so obviously non-source refs never cost a sandbox command."""
+        cited = [str(PurePosixPath(p.strip())) for p in (ref.name, ref.file) if p and p.strip()]
+        idents = [i for i in (c.split("::")[-1].split("(")[0].strip() for c in cited) if _IDENT.fullmatch(i)]
+        if any(i in FUZZ_ENTRYPOINTS for i in idents) or any(rx.search(c) for c in cited for rx in PROTECTED_PATTERNS):
+            return True
+        if any(i in self._out_executables() for i in idents):
+            return True
+        harness = self._harness_files()
+        if any(i in {PurePosixPath(h).stem for h in harness} for i in idents):
+            return True
+        for c in cited:
+            rel = c.lstrip("./")
+            if ("/" in c or "." in c) and rel and any(h == c or h.endswith("/" + rel) for h in harness):
+                return True
+        return False
 
     def _identifiers(self) -> list[str]:
         """All function-like identifiers in the tree (for 'did you mean')."""
@@ -159,11 +194,9 @@ class FactChecker:
         attachment_names |= {n[:-4] for n in attachment_names if n.endswith(".hex")}
         source_refs = []
         for ref in refs:
-            paths = (ref.name, ref.file)
-            if any(p and (PurePosixPath(p).parts[:2] in (("/", "out"), ("/", "work"))
-                          or p in attachment_names) for p in paths):
+            if any(p and p in attachment_names for p in (ref.name, ref.file)):
                 continue
-            if _IDENT.fullmatch(ref.name) and ref.name in self._out_executables():
+            if ref.kind != "line" and self._is_harness_ref(ref):   # line refs: checked once their file is known
                 continue
             if ref.kind == "line":
                 file = ref.file or claim.affected_file
@@ -172,7 +205,7 @@ class FactChecker:
                 # Extractors sometimes put the number in name rather than line.
                 line = ref.line if ref.line is not None else (int(ref.name) if ref.name.isdecimal() else None)
                 ref = ref.model_copy(update={"file": file, "line": line})
-                if PurePosixPath(file).parts[:2] in (("/", "out"), ("/", "work")) or file in attachment_names:
+                if file in attachment_names or self._is_harness_ref(ref):
                     continue
             source_refs.append(ref)
         # Retain every distinct quoted block even when its display row is a duplicate.
