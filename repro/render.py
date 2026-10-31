@@ -59,7 +59,7 @@ def render(v: Verdict) -> str:
         status = "✅ validated" if (p.build_ok and not p.poc_still_crashes and p.tests_ok is not False) else "⚠️ not validated"
         L.append(f"### Proposed fix ({status})")
         L.append(f"- Builds: {'yes' if p.build_ok else 'no'} · PoC fixed: {'yes' if not p.poc_still_crashes else 'no'} · "
-                 f"Tests: {'n/a' if p.tests_ok is None else ('pass' if p.tests_ok else 'FAIL')}")
+                 f"Tests: {'no tests available' if p.tests_ok is None else ('pass' if p.tests_ok else 'FAIL')}")
         L.append("```diff\n" + p.diff[:6000] + "\n```")
     elif v.kind == VerdictKind.VERIFIED:
         L.append("### Proposed fix")
