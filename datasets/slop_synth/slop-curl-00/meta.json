@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "project": "curl",
+  "failure_mode": "hallucinated_function",
+  "cited": [
+    "Curl_proxy_negotiate_upstream_auth",
+    "lib/proxy.h",
+    "lib/proxy.c"
+  ],
+  "generator_reported_mode": "hallucinated_function"
+}

@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "project": "muparser",
+  "failure_mode": "non_reproducible",
+  "cited": [
+    "IsHexValue",
+    "src/muParserBase.cpp",
+    "CheckKeywords",
+    "CalcBulk",
+    "include/muParserTokenReader.h"
+  ],
+  "generator_reported_mode": "non_reproducible"
+}

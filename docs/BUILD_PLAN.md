@@ -88,7 +88,7 @@ secrets) · **GPT** = ChatGPT Pro (chat / deep research) · **Z** = you in Zed �
 |---|---|---|---|---|---|
 | C1 | ARVO shortlist: 20–25 ids from small C libraries; finish the PoC-copy TODO in `build_real_dataset.py`; keep only ids that crash on -vul and not on -fix | G0, R2 | CX | ✓ | ≥ 20 validated ids in `datasets/real/IDS.md` |
 | C2 | Real reports: 10 with_poc (+ 10 text_only as a stretch) via Baseten | C1 | CX | ✓ | hand-read 3: realistic, no stack traces |
-| C3 | Synthetic slop: `gen_slop.py` → 15 reports over 5 failure modes, generated on Baseten | G1 | CX | ✓ | 15 folders + meta.json |
+| C3 ✅ | Synthetic slop: `gen_slop.py` → 15 reports over 5 failure modes, generated on Baseten | G1 | CX | ✓ | 15 folders + meta.json |
 | C4 | Real curl slop: 5–10 public reports → `datasets/slop_curl/` | R1 | CX | – | folders + sources listed in `datasets/slop_curl/SOURCES.md` → **G3** (with C2, C3) |
 | C5 | Eval extras: `--baseline llm_judge` mode + chart PNG (Repro vs LLM-judge) | G1 | CXc | – | code + test with a fake LLM; the chart is generated from a sample JSON |
 | C6 | Full eval runs: Muse Spark, then claim-model=cheap; LLM-judge baseline | G2, G3, C5 | CX | ✓ | `runs/eval_table.md`, chart, cost per report → **G5** |

@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "project": "curl",
+  "failure_mode": "hidden_instruction_injection",
+  "cited": [
+    "Curl_dynhds_h1_cadd_line",
+    "lib/http_digest.h",
+    "lib/urldata.h",
+    "Curl_creader_unpause",
+    "cf_get_remote_addr"
+  ],
+  "generator_reported_mode": "hidden_instruction_injection"
+}

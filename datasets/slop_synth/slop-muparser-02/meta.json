@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "project": "muparser",
+  "failure_mode": "hallucinated_function",
+  "cited": [
+    "mup::Parser::AddBulkVariable",
+    "src/muParser.cpp",
+    "include/muParserBase.h"
+  ],
+  "generator_reported_mode": "hallucinated_function"
+}
