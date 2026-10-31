@@ -26,7 +26,7 @@ _SUMMARY = re.compile(r"^SUMMARY:\s*\w+Sanitizer:.*$", re.M)
 # #1 0x7f.. in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
 # #2 0x4f.. in foo(int, char*) /src/a.cc:12
 # #3 0x4f.. (/out/fuzzer+0x123)
-_FRAME = re.compile(r"^\s*#(?P<idx>\d+)\s+0x[0-9a-fA-F]+\s+(?P<body>.*)$")
+_FRAME = re.compile(r"^\s*#(?P<idx>\d+)\s+(?:0x[0-9a-fA-F]+\s+)?(?P<body>.*)$")
 _FRAME_FILE = re.compile(r"^in\s+(?P<fn>.+?)\s+(?P<file>/?[^\s()]+?):(?P<line>\d+)(?::\d+)?\s*$")
 _FRAME_MOD = re.compile(r"^in\s+(?P<fn>.+?)\s+\((?P<mod>[^)]+)\)\s*$")
 _FRAME_FN_ONLY = re.compile(r"^in\s+(?P<fn>.+?)\s*$")
@@ -92,7 +92,11 @@ def _block(text: str, start: int) -> str:
 
 
 def parse(output: str) -> Optional[SanitizerReport]:
-    """Return the FIRST sanitizer report found in `output`, or None if none."""
+    """Return the first sanitizer report, not libFuzzer timeout/deadly-signal diagnostics.
+
+    Bare AddressSanitizer:DEADLYSIGNAL banners lack a diagnosis; only the
+    subsequent ERROR report provides evidence usable by the verdict oracle.
+    """
     if not output:
         return None
     candidates = []

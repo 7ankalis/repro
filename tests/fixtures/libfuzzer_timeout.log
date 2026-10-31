@@ -1,0 +1,4 @@
+ALARM: working on the last Unit for 61 seconds
+==1== ERROR: libFuzzer: timeout after 61 seconds
+    #0 0x123 in parse /src/parser.c:10:3
+SUMMARY: libFuzzer: timeout

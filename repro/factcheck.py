@@ -9,6 +9,8 @@ from __future__ import annotations
 import difflib
 import re
 import shlex
+from collections.abc import Iterable
+from pathlib import PurePosixPath
 from typing import Optional
 
 from .sandbox import Sandbox
@@ -86,7 +88,7 @@ class FactChecker:
                 return RefCheck(ref=ref, exists=False, evidence=f"file '{ref.file}' not found")
             r = self.sb.exec(f"wc -l < {shlex.quote(hits[0])}", timeout=30, workdir="/")
             total = int((r.stdout.strip() or "0"))
-            ok = ref.line <= total
+            ok = 1 <= ref.line <= total
             return RefCheck(ref=ref, exists=ok, evidence=f"{hits[0]} has {total} lines; claimed line {ref.line}")
 
         return RefCheck(ref=ref, exists=False, evidence=f"unsupported ref kind {ref.kind}")
@@ -105,7 +107,8 @@ class FactChecker:
             token = probe
         return self._grep_count(token, fixed=True) > 0
 
-    def run(self, claim: Claim) -> FactCheckResult:
+    def run(self, claim: Claim, attachments: Iterable[str] = ()) -> FactCheckResult:
+        """Check source refs only; callers supply report attachment names, never contents."""
         refs = list(claim.code_refs)
         # Always check the claimed function/file even if the extractor forgot to list them.
         if claim.affected_function and not any(r.name == claim.affected_function for r in refs):
@@ -113,12 +116,31 @@ class FactChecker:
         if claim.affected_file and not any(r.name == claim.affected_file for r in refs):
             refs.append(CodeRef(kind="file", name=claim.affected_file))
 
-        checks = [self.check_ref(r) for r in refs]
+        attachment_names = set(attachments)
+        # Binary attachments are stored as name.hex and materialized as name by the pipeline.
+        attachment_names |= {n[:-4] for n in attachment_names if n.endswith(".hex")}
+        source_refs = []
+        for ref in refs:
+            paths = (ref.name, ref.file)
+            if any(p and (PurePosixPath(p).parts[:2] in (("/", "out"), ("/", "work"))
+                          or p in attachment_names) for p in paths):
+                continue
+            if ref.kind == "line":
+                file = ref.file or claim.affected_file
+                if not file:
+                    continue
+                # Extractors sometimes put the number in name rather than line.
+                line = ref.line if ref.line is not None else (int(ref.name) if ref.name.isdecimal() else None)
+                ref = ref.model_copy(update={"file": file, "line": line})
+                if PurePosixPath(file).parts[:2] in (("/", "out"), ("/", "work")) or file in attachment_names:
+                    continue
+            source_refs.append(ref)
+        checks = [self.check_ref(r) for r in source_refs]
         missing = [c for c in checks if not c.exists]
         ratio = len(missing) / len(checks) if checks else 0.0
 
         quoted_ok: Optional[bool] = None
-        quoted_blocks = [r.quoted_code for r in refs if r.quoted_code]
+        quoted_blocks = [r.quoted_code for r in source_refs if r.quoted_code]
         if quoted_blocks:
             quoted_ok = all(self.check_quoted_code(q) for q in quoted_blocks)
 

@@ -171,3 +171,119 @@ def test_clone_suffix_normalized():
     from repro.match import _norm_fn
     assert _norm_fn("png_read_row.isra.0") == "png_read_row"
     assert _norm_fn("xmlParseCharRef.constprop.2") == "xmlparsecharref"
+
+
+# B1 synthetic format fixtures complement the captured ARVO muparser log.
+def _fixture(name):
+    from pathlib import Path
+    return (Path(__file__).parent / 'fixtures' / name).read_text()
+
+
+def test_inlined_frames_and_compiler_clones():
+    from repro.match import _norm_fn
+    rep = sanitizer.parse(_fixture('asan_inlined_clones.log'))
+    assert [(f.function, f.file, f.line) for f in rep.frames] == [
+        ('parse.isra.0.constprop.2.cold', '/src/parser.c', 10),
+        ('caller', '/src/parser.c', 20),
+        ('outer [clone .constprop.3]', '/src/parser.c', 30),
+    ]
+    for suffix in ('.isra.0', '.constprop.2', '.cold', '.isra.0.constprop.2.cold', ' [clone .cold]'):
+        assert _norm_fn('parse' + suffix) == 'parse'
+    for fn in ('parse', 'caller', 'outer'):
+        claim = Claim(summary='s', bug_class=BugClass.heap_buffer_overflow,
+                      affected_function=fn, trigger_description='t')
+        assert match_claim(claim, rep).location_match
+
+
+def test_libfuzzer_diagnostics_are_not_sanitizer_evidence():
+    claim = Claim(summary='s', bug_class=BugClass.unknown, affected_function='parse', trigger_description='t')
+    for name in ('libfuzzer_timeout.log', 'libfuzzer_deadly_signal.log'):
+        log = _fixture(name)
+        assert sanitizer.parse(log) is None
+        assert decide(claim, None, [_attempt(log)])[0] == VerdictKind.NOT_REPRODUCED
+    assert sanitizer.parse('AddressSanitizer:DEADLYSIGNAL\n') is None
+    # A banner must not hide the actual diagnosed ASan failure following it.
+    rep = sanitizer.parse(_fixture('libfuzzer_deadly_signal.log') + ASAN_SEGV_NULL)
+    assert rep.error_type == 'SEGV' and sanitizer.to_bug_class(rep) == BugClass.null_deref
+
+
+def test_leaks_and_captured_muparser_fixture():
+    rep = sanitizer.parse(_fixture('lsan_leaks.log'))
+    assert rep.tool == 'lsan' and rep.error_type == 'memory-leak'
+    assert sanitizer.to_bug_class(rep) == BugClass.memory_leak
+    assert [f.function for f in rep.frames] == ['malloc', 'leak_buffer']
+    assert '48 byte(s)' in rep.summary_line
+    rep = sanitizer.parse(_fixture('arvo_42487096_muparser.log'))
+    assert rep.frames[0].line == 1242
+    assert len(rep.frames) == 9  # excludes the allocation stack
+    assert rep.frames[0].function == 'mu::ParserBase::ParseCmdCodeBulk(int, int) const'
+
+
+class FakeSourceSandbox:
+    """Only model source queries; never execute commands or read a real tree."""
+    def __init__(self):
+        from repro.schemas import Target
+        self.target = Target(project='muparser', image='unused', src_dir='/src/muparser')
+        self.commands = []
+
+    def exec(self, cmd, **kwargs):
+        self.commands.append(cmd)
+        if cmd.startswith('find '):
+            out = '/src/muparser/src/muParserBase.cpp\n' if 'muParserBase.cpp' in cmd else ''
+        elif cmd.startswith('wc -l'):
+            out = '1600'
+        elif 'grep -rhoE' in cmd:
+            out = 'ParseCmdCodeBulk\n'
+        else:
+            out = '1' if 'ParseCmdCodeBulk' in cmd else '0'
+        return ExecResult(cmd=cmd, exit_code=0, stdout=out, stderr='', duration_s=0)
+
+
+def test_factcheck_muparser_skips_non_source_refs():
+    from repro.factcheck import FactChecker
+    refs = [CodeRef(kind='line', name='1242'),
+            CodeRef(kind='file', name='/out/set_eval_fuzzer'),
+            CodeRef(kind='file', name='poc.bin', quoted_code='not source code at all'),
+            CodeRef(kind='file', name='/work/report/poc.bin')]
+    claim = Claim(summary='s', bug_class=BugClass.heap_buffer_overflow,
+                  affected_function='ParseCmdCodeBulk', affected_file='src/muParserBase.cpp',
+                  code_refs=refs, has_poc=True, trigger_description='t')
+    sb = FakeSourceSandbox()
+    fc = FactChecker(sb).run(claim, attachments={'poc.bin': 'untrusted attachment content'})
+    assert len(fc.checks) == 3 and all(c.exists for c in fc.checks)
+    assert fc.checks[0].ref.file == 'src/muParserBase.cpp' and fc.checks[0].ref.line == 1242
+    assert fc.hallucination_ratio == 0 and fc.quoted_code_found is None
+    assert not fc.slop_signals
+    assert not any('/out' in cmd or '/work' in cmd or 'poc.bin' in cmd for cmd in sb.commands)
+    assert decide(claim, fc, [_attempt(_fixture('arvo_42487096_muparser.log'))])[0] == VerdictKind.VERIFIED
+    claim.code_refs.append(CodeRef(kind='function', name='HallucinatedFunction'))
+    fc = FactChecker(sb).run(claim, attachments=['poc.bin'])
+    assert fc.hallucination_ratio == 0.25
+    missing = [c for c in fc.checks if not c.exists]
+    assert len(missing) == 1 and missing[0].ref.name == 'HallucinatedFunction'
+    assert any('HallucinatedFunction' in signal for signal in fc.slop_signals)
+
+
+def test_bare_lines_no_file_and_attachment_aliases():
+    from repro.factcheck import FactChecker
+    claim = Claim(summary='s', bug_class=BugClass.heap_buffer_overflow, trigger_description='t', has_poc=True,
+                  code_refs=[CodeRef(kind='line', name='1242'), CodeRef(kind='file', name='poc.bin'),
+                             CodeRef(kind='file', name='/out'), CodeRef(kind='file', name='/work')])
+    sb = FakeSourceSandbox()
+    fc = FactChecker(sb).run(claim, attachments=['poc.bin.hex'])
+    assert fc.checks == [] and fc.hallucination_ratio == 0 and not sb.commands
+    # Similarly named source paths must remain in the denominator.
+    claim.code_refs = [CodeRef(kind='file', name='/outdated/source.c'),
+                       CodeRef(kind='file', name='src/poc.bin')]
+    fc = FactChecker(sb).run(claim, attachments=['poc.bin'])
+    assert len(fc.checks) == 2 and fc.hallucination_ratio == 1
+
+
+def test_line_ref_explicit_file_and_invalid_number():
+    from repro.factcheck import FactChecker
+    claim = Claim(summary='s', bug_class=BugClass.heap_buffer_overflow, trigger_description='t',
+                  code_refs=[CodeRef(kind='line', name='1242', file='src/muParserBase.cpp'),
+                             CodeRef(kind='line', name='bad', file='src/muParserBase.cpp', line=-1)])
+    fc = FactChecker(FakeSourceSandbox()).run(claim)
+    assert [c.exists for c in fc.checks] == [True, False]
+    assert fc.hallucination_ratio == 0.5

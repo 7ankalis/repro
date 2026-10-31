@@ -1,0 +1,7 @@
+==1==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x602000000031
+READ of size 1 at 0x602000000031 thread T0
+    #0 0x123 in parse.isra.0.constprop.2.cold /src/parser.c:10:3
+    #1 in caller /src/parser.c:20:5
+    #2 0x456 in outer [clone .constprop.3] /src/parser.c:30:7
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /src/parser.c:10:3 in parse
