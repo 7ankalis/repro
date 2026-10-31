@@ -1,13 +1,12 @@
 """
-Minimal dashboard (FastAPI). Lane D owns this file + ui/. Start: `repro serve`.
+Dashboard v1 (FastAPI). Lane D owns this file. Start: `repro serve`.
 
   GET /                    queue of triaged reports (reads runs/*/verdict.json)
   GET /run/{run_id}        verdict comment + evidence trace timeline
   GET /api/runs            JSON list
   GET /api/run/{run_id}    verdict + trace events
 
-TODO (Lane D, task D2/D3): live progress via SSE tailing trace.jsonl, "hours saved" counter,
-filters by verdict, side-by-side "report vs evidence" view for the demo video.
+Future D2/D3 work: live SSE trace, filters and report/evidence split view.
 """
 from __future__ import annotations
 
@@ -40,10 +39,12 @@ def api_runs() -> list[dict]:
 
 @app.get("/api/run/{run_id}")
 def api_run(run_id: str) -> dict:
-    d = RUNS / run_id
-    if not (d / "verdict.json").exists() or ".." in run_id:
+    root = RUNS.resolve()
+    d = (root / run_id).resolve()
+    if d.parent != root or not (d / "verdict.json").is_file():
         raise HTTPException(404)
-    trace = [json.loads(ln) for ln in (d / "trace.jsonl").read_text().splitlines() if ln.strip()]
+    trace_path = d / "trace.jsonl"
+    trace = [json.loads(ln) for ln in trace_path.read_text().splitlines() if ln.strip()] if trace_path.exists() else []
     return {"verdict": json.loads((d / "verdict.json").read_text()), "trace": trace}
 
 
@@ -58,25 +59,37 @@ main{max-width:1100px;margin:auto;padding:24px 16px}
 h1{font-size:20px} .mut{color:var(--mut)} table{width:100%;border-collapse:collapse}
 td,th{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
 a{color:#58a6ff} .VERIFIED{color:var(--ok)} .INVALID_CLAIM{color:var(--bad)} .DIFFERENT_BUG{color:var(--warn)}
-.kpi{display:flex;gap:24px;margin:16px 0} .kpi div{border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+.kpi{display:flex;flex-wrap:wrap;gap:24px;margin:16px 0} .kpi div{border:1px solid var(--line);border-radius:8px;padding:12px 16px}
 .kpi b{font-size:22px;display:block} pre{white-space:pre-wrap;background:#161b22;padding:12px;border-radius:6px;overflow:auto}
-</style></head><body><main id="app">loading…</main><script>
+</style></head><body><main id="app" aria-live="polite">Loading runs…</main><script>
 const H=__HOURS__; // report text is attacker-controlled: escape/sanitize EVERYTHING rendered
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function list(){const r=await (await fetch('/api/runs')).json();
+const app=document.getElementById('app');
+async function load(path){
+ const response=await fetch(path);
+ if(!response.ok) throw new Error(response.status===404?'Run not found.':'Unable to load runs.');
+ return response.json();
+}
+async function list(){const r=await load('/api/runs');
  const ver=r.filter(x=>x.kind=='VERIFIED').length, inv=r.filter(x=>x.kind=='INVALID_CLAIM').length;
- const hrs=(r.length*H - r.reduce((a,x)=>a+x.duration_s,0)/3600).toFixed(1);
+ const hrs=Math.max(0,r.length*H - r.reduce((a,x)=>a+x.duration_s,0)/3600).toFixed(1);
+ const spent=r.reduce((a,x)=>a+x.cost_usd,0).toFixed(3);
  app.innerHTML=`<h1>Repro · vulnerability report triage</h1>
  <div class="kpi"><div><b>${r.length}</b>reports triaged</div><div><b class="VERIFIED">${ver}</b>verified</div>
- <div><b class="INVALID_CLAIM">${inv}</b>invalid claims</div><div><b>${hrs}h</b>maintainer time saved</div></div>
+ <div><b class="INVALID_CLAIM">${inv}</b>invalid claims</div><div><b>${hrs}h</b>estimated hours saved</div><div><b>$${spent}</b>API spend</div></div>
+ <p class="mut">Estimate: ${H} hours of manual triage per report, minus recorded run time. Not reproduced ≠ not vulnerable.</p>
+ <h2>Report queue</h2>${r.length?'':'<p>No triaged reports yet.</p>'}
  <table><tr><th>Report</th><th>Verdict</th><th>Headline</th><th>Time</th><th>Cost</th></tr>
- ${r.map(x=>`<tr><td><a href="/run/${encodeURIComponent(x.run_id)}">${esc(x.report_id)}</a></td><td class="${esc(x.kind)}">${esc(x.kind)} ${x.confidence.toFixed(2)}</td>
+ ${r.map(x=>`<tr><td><a href="/run/${esc(encodeURIComponent(x.run_id))}">${esc(x.report_id)}</a></td><td class="${esc(x.kind)}">${esc(x.kind)} ${x.confidence.toFixed(2)}</td>
  <td>${esc(x.headline)}</td><td>${Math.round(x.duration_s)}s</td><td>$${x.cost_usd.toFixed(3)}</td></tr>`).join('')}</table>`}
-async function one(id){const d=await (await fetch('/api/run/'+id)).json();
- app.innerHTML=`<p><a href="/">← queue</a></p>${DOMPurify.sanitize(marked.parse(d.verdict.maintainer_markdown))}
- <h2>Evidence trace (${d.trace.length} events)</h2>${d.trace.map(e=>`<details><summary class="mut">#${e.step} ${esc(e.stage)} · ${esc(e.kind)}</summary><pre>${
- JSON.stringify(e.data,null,2).replace(/</g,'&lt;')}</pre></details>`).join('')}`}
-const m=location.pathname.match(/^\\/run\\/(.+)$/); m?one(m[1]):list();
+async function one(id){const d=await load('/api/run/'+id);
+ app.innerHTML=`<p><a href="/">← queue</a></p><h1>${esc(d.verdict.report_id)}</h1>
+ <p><strong class="${esc(d.verdict.kind)}">${esc(d.verdict.kind)}</strong> · $${d.verdict.cost_usd.toFixed(3)} · ${Math.round(d.verdict.duration_s)}s</p>
+ ${d.verdict.kind==='NOT_REPRODUCED'?'<p>Not reproduced ≠ not vulnerable.</p>':''}
+ ${DOMPurify.sanitize(marked.parse(d.verdict.maintainer_markdown))}
+ <h2>Evidence trace (${d.trace.length} events)</h2>${d.trace.length?'':'<p>No trace events recorded.</p>'}${d.trace.map(e=>`<details><summary class="mut">#${esc(e.step)} ${esc(e.stage)} · ${esc(e.kind)}</summary><pre>${
+ esc(JSON.stringify(e.data,null,2))}</pre></details>`).join('')}`}
+const m=location.pathname.match(/^\\/run\\/(.+)$/); (m?one(m[1]):list()).catch(error=>{app.innerHTML=`<p role="alert">${esc(error.message)}</p><p><a href="/">← queue</a></p>`});
 </script></body></html>"""
 
 
