@@ -1,0 +1,33 @@
+{
+  "id": "11504",
+  "project": "libxml2",
+  "image": "n132/arvo:11504-vul",
+  "fixed_image": "n132/arvo:11504-fix",
+  "command": "/out/libxml2_xml_reader_for_file_fuzzer /work/c1-poc",
+  "poc_source": "/tmp/poc",
+  "poc_sha256": "ef3c2220b9c9e98ae0d60dfcec848fc3c7e40782c9555b16efe4fb50d29e5c4e",
+  "poc_bytes": 1048,
+  "function": "xmlFreeNode",
+  "file": "/src/libxml2/tree.c",
+  "bug_type": "attempting",
+  "fuzz_target": "/out/libxml2_xml_reader_for_file_fuzzer",
+  "vulnerable": {
+    "cmd": "/out/libxml2_xml_reader_for_file_fuzzer /work/c1-poc",
+    "exit_code": 1,
+    "stdout": "Reading 1048 bytes from /work/c1-poc\n",
+    "stderr": "mesg: ttyname failed: Inappropriate ioctl for device\n======================= INFO =========================\nThis binary is built for AFL-fuzz.\nTo run the target function on individual input(s) execute this:\n  /out/libxml2_xml_reader_for_file_fuzzer < INPUT_FILE\nor\n  /out/libxml2_xml_reader_for_file_fuzzer INPUT_FILE1 [INPUT_FILE2 ... ]\nTo fuzz with afl-fuzz execute this:\n  afl-fuzz [afl-flags] /out/libxml2_xml_reader_for_file_fuzzer [-N]\nafl-fuzz will run N iterations before re-spawning the process (default: 1000)\n======================================================\n=================================================================\n==33==ERROR: AddressSanitizer: attempting free on address which was not malloc()-ed: 0x619000000ad9 in thread T0\n    #0 0x4eba50 in __interceptor_free /src/llvm/projects/compiler-rt/lib/asan/asan_malloc_linux.cc:124\n    #1 0x53ee7d in xmlFreeNode /src/libxml2/tree.c:3789:2\n    #2 0x5c7012 in xmlTextReaderStartElementNs /src/libxml2/xmlreader.c:736:2\n    #3 0x67cd65 in xmlParseStartTag2 /src/libxml2/parser.c\n    #4 0x687413 in xmlParseTryOrFinish /src/libxml2/parser.c:11342:14\n    #5 0x684568 in xmlParseChunk /src/libxml2/parser.c:12244:13\n    #6 0x5c22e0 in xmlTextReaderPushData /src/libxml2/xmlreader.c:918:12\n    #7 0x5bf654 in xmlTextReaderRead /src/libxml2/xmlreader.c:1378:8\n    #8 0x530b11 in LLVMFuzzerTestOneInput /src/libxml2_xml_reader_for_file_fuzzer.cc:43:10\n    #9 0x53283a in ExecuteFilesOnyByOne(int, char**) /src/libfuzzer/afl/afl_driver.cpp:301:5\n    #10 0x532d9e in main /src/libfuzzer/afl/afl_driver.cpp:339:12\n    #11 0x703322e2c83f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2083f)\n    #12 0x41d0c8 in _start (/out/libxml2_xml_reader_for_file_fuzzer+0x41d0c8)\n\n0x619000000ad9 is located 89 bytes inside of 1048-byte region [0x619000000a80,0x619000000e98)\nallocated by thread T0 here:\n    #0 0x4ebe1f in malloc /src/llvm/projects/compiler-rt/lib/asan/asan_malloc_linux.cc:146\n    #1 0x605539 in xmlDictAddString /src/libxml2/dict.c:270:29\n    #2 0x604bfc in xmlDictLookup /src/libxml2/dict.c:955:11\n    #3 0x66ebaa in xmlDetectSAX2 /src/libxml2/parser.c:1076:21\n    #4 0x683c09 in xmlParseChunk /src/libxml2/parser.c:12145:9\n    #5 0x5c1eaf in xmlTextReaderPushData /src/libxml2/xmlreader.c:876:12\n    #6 0x5bef41 in xmlTextReaderRead /src/libxml2/xmlreader.c:1315:12\n    #7 0x530b11 in LLVMFuzzerTestOneInput /src/libxml2_xml_reader_for_file_fuzzer.cc:43:10\n    #8 0x53283a in ExecuteFilesOnyByOne(int, char**) /src/libfuzzer/afl/afl_driver.cpp:301:5\n    #9 0x532d9e in main /src/libfuzzer/afl/afl_driver.cpp:339:12\n    #10 0x703322e2c83f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2083f)\n\nSUMMARY: AddressSanitizer: bad-free /src/llvm/projects/compiler-rt/lib/asan/asan_malloc_linux.cc:124 in __interceptor_free\n==33==ABORTING\n",
+    "duration_s": 0.07,
+    "timed_out": false
+  },
+  "fixed": {
+    "cmd": "/out/libxml2_xml_reader_for_file_fuzzer /work/c1-poc",
+    "exit_code": 0,
+    "stdout": "Reading 1048 bytes from /work/c1-poc\nExecution successful\n",
+    "stderr": "mesg: ttyname failed: Inappropriate ioctl for device\n======================= INFO =========================\nThis binary is built for AFL-fuzz.\nTo run the target function on individual input(s) execute this:\n  /out/libxml2_xml_reader_for_file_fuzzer < INPUT_FILE\nor\n  /out/libxml2_xml_reader_for_file_fuzzer INPUT_FILE1 [INPUT_FILE2 ... ]\nTo fuzz with afl-fuzz execute this:\n  afl-fuzz [afl-flags] /out/libxml2_xml_reader_for_file_fuzzer [-N]\nafl-fuzz will run N iterations before re-spawning the process (default: 1000)\n======================================================\n",
+    "duration_s": 0.05,
+    "timed_out": false
+  },
+  "checked_at": "2026-10-31T16:24:25.181418+00:00",
+  "mode": "with_poc",
+  "directory": "arvo-11504-with_poc"
+}

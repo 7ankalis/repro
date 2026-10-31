@@ -1,0 +1,33 @@
+{
+  "id": "781",
+  "project": "pcre2",
+  "image": "n132/arvo:781-vul",
+  "fixed_image": "n132/arvo:781-fix",
+  "command": "/out/pcre2_fuzzer /work/c1-poc",
+  "poc_source": "/tmp/poc",
+  "poc_sha256": "356ad77b944665a3190ad13ab30520d51e0687d111bd1f43da780e1e1b69d4e0",
+  "poc_bytes": 8,
+  "function": "match",
+  "file": "/src/pcre2/src/pcre2_match.c",
+  "bug_type": "stack-buffer-overflow",
+  "fuzz_target": "/out/pcre2_fuzzer",
+  "vulnerable": {
+    "cmd": "/out/pcre2_fuzzer /work/c1-poc",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "INFO: Running with entropic power schedule (0xFF, 100).\nINFO: Seed: 520220149\nINFO: Loaded 1 modules   (7149 inline 8-bit counters): 7149 [0x6bfd00, 0x6c18ed), \nINFO: Loaded 1 PC tables (7149 PCs): 7149 [0x658d40,0x674c10), \n/out/pcre2_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\n=================================================================\n==35==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7fff7c45d5d0 at pc 0x00000049fec1 bp 0x7fff7c45a8d0 sp 0x7fff7c45a0a0\nREAD of size 496 at 0x7fff7c45d5d0 thread T0\n    #0 0x49fec0 in __asan_memcpy /src/llvm-project/compiler-rt/lib/asan/asan_interceptors_memintrinsics.cpp:22:3\n    #1 0x5dea62 in match /src/pcre2/src/pcre2_match.c:819:5\n    #2 0x59ae16 in pcre2_match_8 /src/pcre2/src/pcre2_match.c:6583:8\n    #3 0x56c714 in LLVMFuzzerTestOneInput /src/pcre2/src/pcre2_fuzzsupport.c:193:19\n    #4 0x4fc583 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:611:15\n    #5 0x4e7ce2 in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:324:6\n    #6 0x4ed58c in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:860:9\n    #7 0x516ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10\n    #8 0x746ac53b5082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 87b331c034a6458c64ce09c03939e947212e18ce)\n    #9 0x41f6fd in _start (/out/pcre2_fuzzer+0x41f6fd)\n\nAddress 0x7fff7c45d5d0 is located in stack of thread T0 at offset 10608 in frame\n    #0 0x598d0f in pcre2_match_8 /src/pcre2/src/pcre2_match.c:5992\n\n  This frame has 2 object(s):\n    [32, 296) 'actual_match_block' (line 6022)\n    [368, 10608) 'stack_frames_vector' (line 6030) <== Memory access at offset 10608 overflows this variable\nHINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork\n      (longjmp and C++ exceptions *are* supported)\nSUMMARY: AddressSanitizer: stack-buffer-overflow /src/llvm-project/compiler-rt/lib/asan/asan_interceptors_memintrinsics.cpp:22:3 in __asan_memcpy\nShadow bytes around the buggy address:\n  0x10006f883a60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x10006f883a70: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x10006f883a80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x10006f883a90: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x10006f883aa0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n=>0x10006f883ab0: 00 00 00 00 00 00 00 00 00 00[f3]f3 f3 f3 f3 f3\n  0x10006f883ac0: f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3\n  0x10006f883ad0: f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 f3 00 00 00 00\n  0x10006f883ae0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x10006f883af0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x10006f883b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\nShadow byte legend (one shadow byte represents 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==35==ABORTING\n",
+    "duration_s": 0.08,
+    "timed_out": false
+  },
+  "fixed": {
+    "cmd": "/out/pcre2_fuzzer /work/c1-poc",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "INFO: Running with entropic power schedule (0xFF, 100).\nINFO: Seed: 520538485\nINFO: Loaded 1 modules   (7152 inline 8-bit counters): 7152 [0x6bfd00, 0x6c18f0), \nINFO: Loaded 1 PC tables (7152 PCs): 7152 [0x658d40,0x674c40), \n/out/pcre2_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\nExecuted /work/c1-poc in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n",
+    "duration_s": 0.06,
+    "timed_out": false
+  },
+  "checked_at": "2026-10-31T14:56:44.342000+00:00",
+  "mode": "with_poc",
+  "directory": "arvo-781-with_poc"
+}

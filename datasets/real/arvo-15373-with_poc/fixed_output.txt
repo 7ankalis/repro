@@ -1,0 +1,11 @@
+mesg: ttyname failed: Inappropriate ioctl for device
+INFO: Seed: 1429935502
+INFO: Loaded 1 modules   (1598 inline 8-bit counters): 1598 [0x7f5f98, 0x7f65d6), 
+INFO: Loaded 1 PC tables (1598 PCs): 1598 [0x7f65d8,0x7fc9b8), 
+/out/ares_parse_reply_fuzzer: Running 1 inputs 1 time(s) each.
+Running: /work/c1-poc
+Executed /work/c1-poc in 0 ms
+***
+*** NOTE: fuzzing was not performed, you have only
+***       executed the target code on a fixed set of inputs.
+***

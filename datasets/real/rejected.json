@@ -1,0 +1,18 @@
+[
+  {
+    "id": "3938",
+    "reason": "empty PoC"
+  },
+  {
+    "id": "44393",
+    "reason": "vulnerable run did not produce a sanitizer crash"
+  },
+  {
+    "id": "15904",
+    "reason": "vulnerable run did not produce a sanitizer crash"
+  },
+  {
+    "id": "19844",
+    "reason": "docker pull of -fix timed out after 3600s (Docker Hub throttling; infra, not a rejection)"
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "id": "15373",
+  "project": "c-ares",
+  "image": "n132/arvo:15373-vul",
+  "fixed_image": "n132/arvo:15373-fix",
+  "command": "/out/ares_parse_reply_fuzzer /work/c1-poc",
+  "poc_source": "/tmp/poc",
+  "poc_sha256": "5786549f356146254bcc719053f54b8d4d6a3aa95729992d8f9acdcea8b3eb8e",
+  "poc_bytes": 32,
+  "function": "ares_parse_aaaa_reply",
+  "file": "/src/c-ares/ares_parse_aaaa_reply.c",
+  "bug_type": "heap-buffer-overflow",
+  "fuzz_target": "/out/ares_parse_reply_fuzzer",
+  "vulnerable": {
+    "cmd": "/out/ares_parse_reply_fuzzer /work/c1-poc",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "mesg: ttyname failed: Inappropriate ioctl for device\nINFO: Seed: 1429613670\nINFO: Loaded 1 modules   (1592 inline 8-bit counters): 1592 [0x7f3f98, 0x7f45d0), \nINFO: Loaded 1 PC tables (1592 PCs): 1592 [0x7f45d0,0x7fa950), \n/out/ares_parse_reply_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\n=================================================================\n==33==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6020000001a0 at pc 0x00000053661a bp 0x7fff01a77af0 sp 0x7fff01a772b8\nREAD of size 16 at 0x6020000001a0 thread T0\n    #0 0x536619 in __asan_memcpy /src/llvm/projects/compiler-rt/lib/asan/asan_interceptors_memintrinsics.cc:22:3\n    #1 0x56b42f in ares_parse_aaaa_reply /src/c-ares/ares_parse_aaaa_reply.c:156:11\n    #2 0x568a2a in LLVMFuzzerTestOneInput /src/c-ares/test/ares-test-fuzz.c:18:3\n    #3 0x472121 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:553:15\n    #4 0x45d131 in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:292:6\n    #5 0x462afa in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:773:9\n    #6 0x48b7c2 in main /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerMain.cpp:19:10\n    #7 0x7c6a3c30a83f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2083f)\n    #8 0x41df28 in _start (/out/ares_parse_reply_fuzzer+0x41df28)\n\n0x6020000001a0 is located 0 bytes to the right of 16-byte region [0x602000000190,0x6020000001a0)\nallocated by thread T0 here:\n    #0 0x5371dd in malloc /src/llvm/projects/compiler-rt/lib/asan/asan_malloc_linux.cc:145:3\n    #1 0x571ff3 in ares__parse_into_addrinfo2 /src/c-ares/ares__parse_into_addrinfo.c:137:17\n    #2 0x56abda in ares_parse_aaaa_reply /src/c-ares/ares_parse_aaaa_reply.c:69:12\n    #3 0x568a2a in LLVMFuzzerTestOneInput /src/c-ares/test/ares-test-fuzz.c:18:3\n    #4 0x472121 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:553:15\n    #5 0x45d131 in fuzzer::RunOneTest(fuzzer::Fuzzer*, char const*, unsigned long) /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:292:6\n    #6 0x462afa in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:773:9\n    #7 0x48b7c2 in main /src/llvm/projects/compiler-rt/lib/fuzzer/FuzzerMain.cpp:19:10\n    #8 0x7c6a3c30a83f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2083f)\n\nSUMMARY: AddressSanitizer: heap-buffer-overflow /src/llvm/projects/compiler-rt/lib/asan/asan_interceptors_memintrinsics.cc:22:3 in __asan_memcpy\nShadow bytes around the buggy address:\n  0x0c047fff7fe0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x0c047fff7ff0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00\n  0x0c047fff8000: fa fa 00 00 fa fa 00 fa fa fa 00 fa fa fa 00 fa\n  0x0c047fff8010: fa fa fd fa fa fa fd fa fa fa fd fd fa fa fd fa\n  0x0c047fff8020: fa fa fd fd fa fa fd fa fa fa 01 fa fa fa fd fa\n=>0x0c047fff8030: fa fa 00 00[fa]fa 00 fa fa fa 00 00 fa fa 00 00\n  0x0c047fff8040: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa\n  0x0c047fff8050: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa\n  0x0c047fff8060: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa\n  0x0c047fff8070: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa\n  0x0c047fff8080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa\nShadow byte legend (one shadow byte represents 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n  Shadow gap:              cc\n==33==ABORTING\n",
+    "duration_s": 0.09,
+    "timed_out": false
+  },
+  "fixed": {
+    "cmd": "/out/ares_parse_reply_fuzzer /work/c1-poc",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "mesg: ttyname failed: Inappropriate ioctl for device\nINFO: Seed: 1429935502\nINFO: Loaded 1 modules   (1598 inline 8-bit counters): 1598 [0x7f5f98, 0x7f65d6), \nINFO: Loaded 1 PC tables (1598 PCs): 1598 [0x7f65d8,0x7fc9b8), \n/out/ares_parse_reply_fuzzer: Running 1 inputs 1 time(s) each.\nRunning: /work/c1-poc\nExecuted /work/c1-poc in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n",
+    "duration_s": 0.06,
+    "timed_out": false
+  },
+  "checked_at": "2026-10-31T12:48:43.793324+00:00",
+  "mode": "text_only",
+  "directory": "arvo-15373-text_only"
+}
