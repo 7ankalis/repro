@@ -7,6 +7,7 @@ import time
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import PurePosixPath
 
 from . import match
 from .agent import FINISH_REPRO, run_agent
@@ -42,6 +43,11 @@ def extract_claim(llm: LLM, report: Report) -> Claim:
 
 def triage(report: Report, cfg: Config | None = None, runs_root: str = "runs") -> Verdict:
     cfg = cfg or Config()
+    # Evaluation metadata and the report body are not PoC inputs or model attachments.
+    report = report.model_copy(update={"attachments": {
+        name: data for name, data in report.attachments.items()
+        if PurePosixPath(name.removesuffix(".hex")).name not in ("report.md", "label", "meta.json", "ground_truth.txt")
+    }})
     t0 = time.time()
     run_id = f"{report.id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     tracer = Tracer(run_id, runs_root)
@@ -58,23 +64,34 @@ def triage(report: Report, cfg: Config | None = None, runs_root: str = "runs") -
         tracer.save_json("claim.json", claim)
 
         with Sandbox(report.target) as sb:
-            fc = FactChecker(sb).run(claim)
+            fc = FactChecker(sb).run(claim, attachments=report.attachments)
             v.factcheck = fc
             tracer.save_json("factcheck.json", fc)
 
-            fast_invalid = (cfg.fast_reject and not claim.has_poc and fc.hallucination_ratio >= 0.5)
+            fast_invalid = (cfg.fast_reject and not claim.has_poc and not report.attachments and fc.hallucination_ratio >= 0.5)
             tools = ToolExecutor(sb, tracer)
             if not fast_invalid:
+                poc_paths = []
                 for name, content in report.attachments.items():
+                    relative = PurePosixPath(name[:-4] if name.endswith(".hex") else name)
+                    root = PurePosixPath(cfg.attachments_dir)
+                    if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+                        raise ValueError("Attachment names must be relative paths without parent traversal")
+                    if not root.is_relative_to("/work/report") or ".." in root.parts:
+                        raise ValueError("PoC attachments must stay under /work/report")
+                    path = str(root / relative)
+                    poc_paths.append(path)
                     if name.endswith(".hex"):   # binary PoC stored as hex by io.load_report
-                        sb.write_file(f"{cfg.attachments_dir}/{name[:-4]}", bytes.fromhex(content))
+                        tools.t_write_bytes(path, bytes.fromhex(content).hex())
                     else:
-                        sb.write_file(f"{cfg.attachments_dir}/{name}", content)
+                        tools.t_write_file(path, content)
 
                 def verified_already() -> bool:
                     return any(a.sanitizer and match.match_claim(claim, a.sanitizer).score >= match.VERIFY_THRESHOLD
                                for a in tools.attempts)
 
+                prepass_commands = tools.run_reporter_pocs(poc_paths)
+                prepass_crashed = any(a.sanitizer is not None for a in tools.attempts)
                 user = load_prompt("reproducer_task").format(
                     project=report.target.project, src_dir=report.target.src_dir,
                     build_cmd=report.target.build_cmd, attachments_dir=cfg.attachments_dir,
@@ -83,8 +100,16 @@ def triage(report: Report, cfg: Config | None = None, runs_root: str = "runs") -
                     factcheck="\n".join(fc.slop_signals) or "(all cited code exists)",
                     report=wrap_untrusted("report", report.body[:15000]),
                 )
-                run_agent(llm, tools, tracer, load_prompt("reproducer"), user, FINISH_REPRO,
-                          max_steps=cfg.max_agent_steps, early_stop=verified_already, stage="agent")
+                if prepass_commands and not prepass_crashed:
+                    user += ("\n\nDeterministic attached-PoC pre-pass: no sanitizer crash was detected. "
+                             "The following target/input commands were already run (20 s timeout each). "
+                             "Timeout or nonzero exit alone is not a sanitizer crash:\n"
+                             + wrap_untrusted("prepass_commands", "\n".join(prepass_commands)))
+                elif poc_paths and not prepass_commands:
+                    user += "\n\nDeterministic PoC pre-pass: no eligible executables were found in /out; no inputs were run."
+                if not prepass_crashed:
+                    run_agent(llm, tools, tracer, load_prompt("reproducer"), user, FINISH_REPRO,
+                              max_steps=cfg.max_agent_steps, early_stop=verified_already, stage="agent")
             else:
                 tracer.log("verdict", "fast_reject", {"hallucination_ratio": fc.hallucination_ratio})
 
