@@ -36,7 +36,43 @@ repro serve                       # dashboard at http://127.0.0.1:8000
 ```
 
 ## Results
-_(filled from `runs/eval_table.md` — see docs/EVAL.md)_
+
+Evaluated on 53 reports: 24 real bugs (11 ARVO IDs, each with a `with_poc` and
+`text_only` variant) and 29 slop reports (15 synthetic, 12 real AI-slop
+submissions pulled from curl's HackerOne program, 2 demo cases).
+
+![Repro vs LLM judge](docs/results/eval_chart.png)
+
+| Metric | Repro | Naive LLM judge |
+|---|---|---|
+| **False VERIFIED on slop** (lower is better) | **0/29 (0.0%)** | 0/29 (0.0%) |
+| Slop rejected | 28/29 (96.6%) | 29/29 (100.0%) |
+| **Real bugs confirmed** | **15/24 (62.5%)** | **0/24 (0.0%)** |
+| Median cost / report | $0.076 | $0.012 |
+| Total cost (53 reports) | $5.98 | $0.65 |
+| Errors | **0** | 4 |
+
+**Zero false VERIFIED, zero pipeline errors, across the full dataset.**
+
+The LLM judge's "0.0% false VERIFIED" is not a strength — it got there by
+calling *every single* report slop, including 100% of real bugs. An
+always-reject baseline trivially has no false positives; it also has no
+value. The real comparison is recall on real bugs: Repro confirms **15 of
+24** real vulnerabilities with sanitizer evidence; the one-shot LLM judge,
+reading the same report text with no tools and no code access, confirms
+**zero**.
+
+Of the 11 with-PoC real bugs, Repro verified **11/11** — fast (10-20s) and
+cheap (~$0.02), because the evidence is unambiguous once a real sanitizer
+crash fires. The text-only bucket (no PoC attached, harder by design) is
+where recall drops — this is the expected, honest behavior of a system that
+says "not reproduced" rather than guessing when it can't actually confirm
+something.
+
+[Full comparison table](docs/results/eval_comparison.md) ·
+[Raw metrics](docs/results/eval_table.md) ·
+[Repro's full run](docs/results/eval_results.json) ·
+[LLM-judge baseline run](docs/results/eval_baseline_llm_judge.json)
 
 ## Built with Meta AI
 - **Muse Spark 1.3** — claim extraction (JSON-schema output), autonomous reproduction agent (tool calling), patch agent.
